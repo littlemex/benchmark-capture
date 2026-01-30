@@ -1,0 +1,10 @@
+# Minimal benchmark-capture configuration
+
+[profiler]
+backend = "{{ profiler }}"
+
+[profiler.neuron]
+output_dir = "{{ profiler_output_dir }}"
+
+[profiler.nsight]
+output_dir = "{{ profiler_output_dir }}"

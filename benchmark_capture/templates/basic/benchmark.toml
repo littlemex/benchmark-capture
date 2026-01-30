@@ -1,0 +1,17 @@
+# benchmark-capture configuration for {{ project_name }}
+
+[profiler]
+# Auto-detect hardware (will use "neuron" on Inferentia, "nsight" on GPU)
+backend = "{{ profiler }}"
+
+[profiler.neuron]
+# Output directory for Neuron profiling data
+output_dir = "{{ profiler_output_dir }}"
+# Execution timeout (seconds)
+timeout = {{ timeout }}
+
+[profiler.nsight]
+# Output directory for NSight profiling data
+output_dir = "{{ profiler_output_dir }}"
+# Enable CUDA API tracing
+cuda_api_trace = true

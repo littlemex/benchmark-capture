@@ -1,0 +1,14 @@
+# benchmark-capture configuration for {{ project_name }}
+# vLLM-Neuron on AWS Inferentia/Trainium
+
+[profiler]
+# Use Neuron profiler for Inferentia hardware
+backend = "neuron"
+
+[profiler.neuron]
+# Output directory for Neuron profiling data (.ntff files)
+output_dir = "{{ profiler_output_dir }}"
+# Execution timeout (seconds) - Neuron compilation can take time
+timeout = {{ timeout }}
+# Enable framework profiling (torch profiler integration)
+framework_profile = true

@@ -1,0 +1,15 @@
+# benchmark-capture configuration for {{ project_name }}
+# vLLM-specific benchmark configuration
+
+[profiler]
+backend = "{{ profiler }}"
+
+[profiler.neuron]
+output_dir = "{{ profiler_output_dir }}"
+timeout = {{ timeout }}
+# Enable framework-level profiling for vLLM
+framework_profile = false
+
+[profiler.nsight]
+output_dir = "{{ profiler_output_dir }}"
+cuda_api_trace = true
