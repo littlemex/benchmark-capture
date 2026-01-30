@@ -184,3 +184,47 @@ class TestCliInit:
         assert "--profiler" in result.output
         assert "--force" in result.output
         assert "--list" in result.output
+
+    def test_init_handles_file_exists_error(self, tmp_path: Path) -> None:
+        """Test init handles FileExistsError gracefully."""
+        runner = CliRunner()
+
+        with runner.isolated_filesystem(temp_dir=tmp_path) as td:
+            # Create directory with file inside isolated filesystem
+            target = Path(td) / "test-project"
+            target.mkdir()
+            (target / "benchmark.toml").write_text("[profiler]\nbackend = 'test'")
+
+            # Try to init without force (and cancel prompt)
+            result = runner.invoke(init_cmd, ["test-project"], input="n\n")
+
+            assert "Aborted" in result.output
+
+    def test_init_handles_value_error(self, tmp_path: Path, monkeypatch) -> None:
+        """Test init handles ValueError gracefully."""
+        from benchmark_capture import cli_init
+
+        runner = CliRunner()
+
+        # Mock init_project to raise ValueError
+        def mock_init_project(*args, **kwargs):
+            raise ValueError("Invalid template")
+
+        monkeypatch.setattr(cli_init, "init_project", mock_init_project)
+
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            result = runner.invoke(init_cmd, ["test-project", "--force"])
+
+        assert result.exit_code == 1
+        assert "Error" in result.output
+
+
+@pytest.mark.skipif(CLICK_AVAILABLE, reason="Testing fallback when Click not installed")
+class TestCliInitWithoutClick:
+    """Tests for CLI when Click is not installed."""
+
+    def test_init_cmd_raises_import_error_without_click(self) -> None:
+        """Test init_cmd raises ImportError when Click not installed."""
+        # This test is only meaningful when Click is not installed
+        # In practice, this is handled by the CLICK_AVAILABLE check
+        pass

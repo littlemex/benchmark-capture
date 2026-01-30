@@ -69,6 +69,34 @@ class TestResolveProfilerName:
             del os.environ["BENCHMARK_PROFILER"]
             assert _resolve_profiler_name("auto") == "neuron"
 
+    def test_config_loading_exception_handling(self, clean_env: None) -> None:
+        """Test handles exceptions during config loading gracefully."""
+        with patch("benchmark_capture.decorators.load_config") as mock_load:
+            # Mock load_config to raise an exception
+            mock_load.side_effect = Exception("Config loading failed")
+
+            with patch("benchmark_capture.decorators.detect_hardware") as mock_detect:
+                mock_detect.return_value = "nsight"
+                # Should fall back to auto-detection, not crash
+                result = _resolve_profiler_name("auto")
+                assert result == "nsight"
+
+    def test_config_with_auto_backend(
+        self, clean_env: None, temp_dir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test config file with 'auto' backend falls through to detection."""
+        # Create config with backend = "auto"
+        config_file = temp_dir / "benchmark.toml"
+        config_file.write_text('[profiler]\nbackend = "auto"')
+
+        monkeypatch.chdir(temp_dir)
+
+        with patch("benchmark_capture.decorators.detect_hardware") as mock_detect:
+            mock_detect.return_value = "nsight"
+            # Should use auto-detection, not the 'auto' value
+            result = _resolve_profiler_name("auto")
+            assert result == "nsight"
+
 
 class TestProfileDecorator:
     """Tests for @profile decorator."""

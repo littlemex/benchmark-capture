@@ -84,3 +84,23 @@ class TestConfigLoading:
             _ = load_config(config_file)
             # Note: actual result depends on Python version
             # Python 3.11+ has tomllib built-in
+
+    def test_load_toml_handles_generic_exception(self, temp_dir: Path) -> None:
+        """Test _load_toml handles generic exceptions gracefully."""
+        from benchmark_capture.config import _load_toml
+
+        config_file = temp_dir / "benchmark.toml"
+        config_file.write_text("invalid { toml }")
+
+        # Should return empty dict without crashing
+        config = _load_toml(config_file)
+        assert config == {}
+
+    def test_load_config_handles_exception(self, temp_dir: Path) -> None:
+        """Test handles generic exception when loading config."""
+        config_file = temp_dir / "benchmark.toml"
+        config_file.write_text("[[[[invalid toml")
+
+        # Should return empty dict without crashing
+        config = load_config(config_file)
+        assert config == {}
