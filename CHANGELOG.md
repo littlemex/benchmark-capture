@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-01-30
+
+### Added
+
+- **Perfetto Mode for Advanced Analysis**
+  - New `perfetto=True` option for `@profile()` decorator
+  - Generates Perfetto-compatible NTFF files in session directories
+  - Automatic `NEURON_RT_INSPECT_*` environment variable configuration
+  - Session directory pattern: `i-<instance>_pid_<number>/`
+  - Enhanced metadata with `perfetto_mode`, `session_dir`, and `ntff_files` fields
+  - Enables visualization in Perfetto UI and analysis with neuron-workflow
+
+- **vLLM-Neuron Reranker Example**
+  - Perfetto mode enabled by default in reranker example
+  - Output verification commands in docstring
+  - Ready for production profiling workflows
+
+- **Documentation**
+  - Comprehensive Perfetto mode section in README
+  - Comparison table: Standard vs Perfetto mode
+  - Output verification examples with expected results
+  - Metadata field differences explained
+  - Troubleshooting guide for common issues
+  - NTFF conversion instructions
+
+### Changed
+
+- NeuronProfiler: Split `setup()` into `_setup_standard_mode()` and `_setup_perfetto_mode()`
+- Metadata structure: Now includes mode-specific fields for better clarity
+- Environment variable cleanup: Handles both standard and Perfetto mode variables
+
+### Technical Details
+
+- 100% backward compatibility - default behavior unchanged
+- Test coverage: 89% for neuron.py, 73% overall
+- All 126 tests passing (7 new Perfetto mode tests added)
+- No new external dependencies required
+
 ## [0.2.1] - 2026-01-30
 
 ### Initial Release
@@ -70,5 +108,6 @@ pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://
 - LLM inference profiling on NVIDIA GPUs
 - General Python function benchmarking with hardware-aware profiling
 
-[Unreleased]: https://github.com/littlemex/benchmark-capture/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/littlemex/benchmark-capture/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/littlemex/benchmark-capture/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/littlemex/benchmark-capture/releases/tag/v0.2.1

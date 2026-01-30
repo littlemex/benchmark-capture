@@ -7,7 +7,7 @@ Provides automatic hardware detection and profiling for benchmarks:
 - Auto-detection with graceful fallback
 """
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 from .decorators import profile
 
