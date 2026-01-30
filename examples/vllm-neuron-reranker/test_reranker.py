@@ -10,12 +10,16 @@ Run with:
 
 import csv
 import gc
+import logging
 from pathlib import Path
 
 import pytest
 import vllm
 from vllm import SamplingParams
 from benchmark_capture import profile
+
+# Configure logging for real-time progress updates
+logger = logging.getLogger(__name__)
 
 
 @pytest.mark.benchmark(group="reranker")
@@ -44,16 +48,16 @@ def test_vllm_neuron_reranker(
     batch_size = reranker_config['batch_size']
     max_length = reranker_config['max_length']
 
-    print(f"\n✓ Loaded {len(rows)} queries from {csv_file}")
-    print(f"  Testing with first {num_queries} queries")
+    logger.info(f"Loaded {len(rows)} queries from {csv_file}")
+    logger.info(f"Testing with first {num_queries} queries")
 
     def setup():
         """Initialize vLLM with reranker model"""
-        print("\n🔧 Initializing vLLM-Neuron reranker...")
-        print(f"   Model: {model_path}")
-        print(f"   Config: block_size={vllm_config['block_size']}, "
-              f"max_num_seqs={vllm_config['max_num_seqs']}, "
-              f"tensor_parallel_size={vllm_config['tensor_parallel_size']}")
+        logger.info("Initializing vLLM-Neuron reranker...")
+        logger.info(f"Model: {model_path}")
+        logger.info(f"Config: block_size={vllm_config['block_size']}, "
+                   f"max_num_seqs={vllm_config['max_num_seqs']}, "
+                   f"tensor_parallel_size={vllm_config['tensor_parallel_size']}")
 
         llm = vllm.LLM(model=model_path, **vllm_config)
 
@@ -62,8 +66,8 @@ def test_vllm_neuron_reranker(
         token_false_id = tokenizer.convert_tokens_to_ids(token_ids['false'])
         token_true_id = tokenizer.convert_tokens_to_ids(token_ids['true'])
 
-        print(f"   Token IDs: {token_ids['true']}={token_true_id}, "
-              f"{token_ids['false']}={token_false_id}")
+        logger.info(f"Token IDs: {token_ids['true']}={token_true_id}, "
+                   f"{token_ids['false']}={token_false_id}")
 
         # Encode prompt templates
         prefix_tokens = tokenizer.encode(
@@ -73,7 +77,7 @@ def test_vllm_neuron_reranker(
             reranker_prompts['suffix'], add_special_tokens=False
         )
 
-        print(f"   Prefix tokens: {len(prefix_tokens)}, Suffix tokens: {len(suffix_tokens)}")
+        logger.info(f"Prefix tokens: {len(prefix_tokens)}, Suffix tokens: {len(suffix_tokens)}")
 
         return llm, tokenizer, token_true_id, token_false_id, prefix_tokens, suffix_tokens
 
@@ -121,8 +125,8 @@ def test_vllm_neuron_reranker(
             allowed_token_ids=[token_true_id, token_false_id]
         )
 
-        print(f"\n✓ SamplingParams configured: max_tokens=1, "
-              f"allowed_tokens=[{token_ids['true']}, {token_ids['false']}]")
+        logger.info(f"SamplingParams configured: max_tokens=1, "
+                    f"allowed_tokens=[{token_ids['true']}, {token_ids['false']}]")
 
         # Process each query
         total_processed = 0
@@ -153,15 +157,15 @@ def test_vllm_neuron_reranker(
 
             if query_idx == 0:
                 # Show first result for verification
-                print(f"\n  Query 1: {query[:80]}...")
-                print(f"  Generated {len(query_outputs)} scores for "
-                      f"{len(candidates[:search_num])} candidates")
+                logger.info(f"Query 1: {query[:80]}...")
+                logger.info(f"Generated {len(query_outputs)} scores for "
+                           f"{len(candidates[:search_num])} candidates")
                 if query_outputs:
                     first_output = query_outputs[0]
-                    print(f"  First output: {first_output.outputs[0].text} "
-                          f"(token_ids={first_output.outputs[0].token_ids})")
+                    logger.info(f"First output: {first_output.outputs[0].text} "
+                               f"(token_ids={first_output.outputs[0].token_ids})")
 
-        print(f"\n✓ Benchmark completed: processed {total_processed} reranker pairs")
+        logger.info(f"Benchmark completed: processed {total_processed} reranker pairs")
         return total_processed
 
     def teardown(llm):

@@ -287,6 +287,139 @@ export BENCHMARK_PROFILER=noop
 pytest tests/
 ```
 
+## Real-Time Output & Logging
+
+**For long-running benchmarks** (e.g., vLLM-Neuron compilation, large model inference), real-time progress output is essential. This library follows OSS best practices for pytest output management.
+
+### Best Practice: Use Python Logging
+
+**Instead of `print()`:**
+```python
+import logging
+
+logger = logging.getLogger(__name__)
+
+@profile()
+def test_long_benchmark(benchmark):
+    logger.info("Starting model initialization...")
+    model = load_model()  # Long operation
+    logger.info("Model loaded successfully")
+
+    logger.info("Running inference...")
+    result = benchmark(model.predict, data)
+    logger.info(f"Completed: {result}")
+```
+
+**Why logging instead of print?**
+- ✅ Works with pytest's capture system
+- ✅ Real-time output via `log_cli = true`
+- ✅ Configurable log levels
+- ✅ Automatic timestamps
+- ✅ Can write to both console and file
+
+### Configuration (pyproject.toml)
+
+```toml
+[tool.pytest.ini_options]
+# Enable real-time logging to console
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s [%(levelname)s] %(message)s"
+log_cli_date_format = "%H:%M:%S"
+
+# Optional: Also write to file
+log_file = "pytest.log"
+log_file_level = "DEBUG"
+```
+
+### Run with Different Log Levels
+
+```bash
+# Default (INFO level)
+pytest test_benchmark.py --benchmark-only
+
+# Verbose (DEBUG level)
+pytest test_benchmark.py --benchmark-only --log-cli-level=DEBUG
+
+# Quiet (only WARNING and ERROR)
+pytest test_benchmark.py --benchmark-only --log-cli-level=WARNING
+
+# Disable output capture (for print statements)
+pytest test_benchmark.py --benchmark-only -s
+```
+
+### Common Pattern for Long Benchmarks
+
+```python
+import logging
+
+logger = logging.getLogger(__name__)
+
+@pytest.mark.benchmark
+@profile()
+def test_vllm_neuron_inference(benchmark, model_path, vllm_config):
+    """Long-running vLLM-Neuron benchmark with progress updates."""
+
+    def setup():
+        logger.info("Initializing vLLM-Neuron (this may take 10-15 minutes)...")
+        logger.info(f"Model: {model_path}")
+        logger.info(f"Config: {vllm_config}")
+
+        llm = vllm.LLM(model=model_path, **vllm_config)
+        logger.info("vLLM-Neuron initialized successfully")
+        return llm
+
+    def run_benchmark(llm):
+        logger.info("Starting inference benchmark...")
+        result = llm.generate(prompts)
+        logger.info(f"Completed {len(result)} generations")
+        return result
+
+    llm = setup()
+    benchmark(run_benchmark, llm)
+```
+
+**Output during execution:**
+```
+12:34:56 [INFO] Initializing vLLM-Neuron (this may take 10-15 minutes)...
+12:34:56 [INFO] Model: /path/to/model
+12:34:56 [INFO] Config: {'block_size': 32, ...}
+12:45:23 [INFO] vLLM-Neuron initialized successfully
+12:45:23 [INFO] Starting inference benchmark...
+12:45:45 [INFO] Completed 10 generations
+```
+
+### Why Not `sys.stdout.flush()`?
+
+Common misconception: Using `sys.stdout.flush()` or `PYTHONUNBUFFERED=1`.
+
+**These don't work** because:
+- pytest's capture mechanisms intercept output before flush
+- The solution is to use pytest's built-in logging system
+
+### Progress Bars (tqdm)
+
+For loops with progress tracking:
+
+```python
+from tqdm import tqdm
+import sys
+
+for item in tqdm(items, file=sys.stderr, desc="Processing"):
+    # work
+    pass
+
+# Or run with: pytest -s (disables capture)
+```
+
+### References
+
+This approach is used by major OSS projects:
+- **PyTorch**: Uses `--capture=sys` with extensive pytest.ini configuration
+- **vLLM**: Uses Python logging with `VLLM_CONFIGURE_LOGGING` env var
+- **pytest-benchmark**: Provides `--benchmark-verbose` flag for detailed output
+- **HuggingFace Transformers**: Uses logging module throughout benchmark code
+
 ## AWS Neuron Environment Setup
 
 **CRITICAL**: When using vLLM-Neuron on AWS Inferentia/Trainium, you **MUST** activate the Neuron SDK virtual environment before running benchmarks.

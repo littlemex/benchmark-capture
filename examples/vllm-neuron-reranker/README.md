@@ -76,9 +76,21 @@ def reranker_prompts():
 # Activate vLLM-Neuron environment
 source /opt/aws_neuronx_venv_pytorch_inference_vllm_0_13/bin/activate
 
-# Run benchmark
+# Run benchmark (default - with real-time logging)
 pytest test_reranker.py --benchmark-only --benchmark-json=results.json -v
+
+# For quieter output (only final results)
+pytest test_reranker.py --benchmark-only --benchmark-json=results.json -v --log-cli-level=WARNING
 ```
+
+**Real-time Progress Output:**
+The benchmark uses Python logging for real-time progress updates. You'll see:
+- Model initialization status
+- Token configuration
+- First query verification
+- Completion status
+
+This is especially useful for long-running benchmarks on Inferentia2.
 
 ## Customization
 
