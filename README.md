@@ -226,6 +226,7 @@ cd my-reranker
 - **vllm-neuron-reranker** - Complete Qwen3-Reranker benchmark
   - Includes sample CSV data (10 queries, 20 candidates each)
   - Configuration-driven (config.yaml)
+  - **Perfetto mode enabled by default** for NTFF generation
   - Production-ready code
   - Just download model from Hugging Face and run!
 
@@ -381,10 +382,24 @@ test_vllm_neuron_reranker         3.042    3.062    3.052    0.010
   print(f\"Latency/query: {b['extra_info']['latency_per_query_ms']:.2f}ms\")
   "
   ```
-- Profile traces in `/tmp/profiles/` (configurable)
+
+- **Perfetto Mode Output** - NTFF files in session directory (default in reranker example)
   ```bash
-  # Check profile metadata
-  cat /tmp/profiles/metadata.json
+  # Check session directory was created (Perfetto mode)
+  ls -la ./benchmarks/i-*_pid_*/
+  # Expected: neff_*.ntff files
+
+  # Verify Perfetto mode is enabled
+  cat ./benchmarks/metadata.json | jq '.perfetto_mode'
+  # Expected: true
+
+  # View session directory path
+  cat ./benchmarks/metadata.json | jq '.session_dir'
+  # Expected: "./benchmarks/i-<instance>_pid_<number>"
+
+  # List all NTFF files
+  cat ./benchmarks/metadata.json | jq '.ntff_files'
+  # Expected: ["i-.../neff_001.ntff", "i-.../neff_002.ntff", ...]
   ```
 
 **Neuron Cache Management:**
@@ -542,6 +557,114 @@ def test_custom_output(benchmark):
 def test_with_options(benchmark):
     ...
 ```
+
+### Perfetto Mode for Advanced Analysis
+
+Enable Perfetto-compatible NTFF generation for visualization in Perfetto UI:
+
+```python
+@profile("neuron", perfetto=True, output_dir="/tmp/profiles")
+def test_perfetto_profile(benchmark):
+    result = benchmark(llm.generate, prompts)
+    # Generates session directory: /tmp/profiles/i-<instance>_pid_<number>/
+    # Contains NTFF files suitable for Perfetto analysis
+```
+
+**Standard vs Perfetto Mode:**
+
+| Feature | Standard Mode | Perfetto Mode |
+|---------|--------------|---------------|
+| Decorator | `@profile("neuron")` | `@profile("neuron", perfetto=True)` |
+| Environment Variables | `NEURON_PROFILE` | `NEURON_RT_INSPECT_*` |
+| Output Structure | `/tmp/profiles/*.ntff` | `/tmp/profiles/i-*_pid_*/` |
+| Metadata Fields | `profile_files: [...]` | `session_dir: "...", ntff_files: [...]` |
+| Use Case | neuron-profile CLI | Perfetto UI / External tools |
+
+**Detailed Comparison:**
+
+- **Standard mode** (`perfetto=False`, default):
+  - Sets `NEURON_PROFILE` environment variable
+  - Generates `.ntff` files directly in output directory
+  - Compatible with `neuron-profile` CLI tools
+  - Metadata contains `profile_files` list
+
+- **Perfetto mode** (`perfetto=True`):
+  - Sets `NEURON_RT_INSPECT_*` environment variables
+  - Generates session directory with NTFF files
+  - Session directory pattern: `i-<instance>_pid_<number>/`
+  - Files ready for Perfetto conversion (use external tools like `neuron-workflow`)
+  - Metadata contains `session_dir` and `ntff_files` list
+
+**Verifying Perfetto Mode Output:**
+
+After running your benchmark with `perfetto=True`, verify the output:
+
+```bash
+# 1. Check session directory was created
+ls -la /tmp/profiles/
+# Expected: i-<instance_id>_pid_<process_id>/ directory
+
+# 2. List NTFF files in session directory
+ls -la /tmp/profiles/i-*_pid_*/
+# Expected: neff_*.ntff files
+
+# 3. Check metadata.json
+cat /tmp/profiles/metadata.json | jq
+# Expected fields:
+# - "perfetto_mode": true
+# - "session_dir": "/tmp/profiles/i-..."
+# - "ntff_files": ["i-.../neff_001.ntff", ...]
+```
+
+**Example metadata.json for Perfetto mode:**
+
+```json
+{
+  "function": "test_inference",
+  "profiler": "NeuronProfiler",
+  "perfetto_mode": true,
+  "session_dir": "/tmp/profiles/i-0abc123_pid_45678",
+  "ntff_files": [
+    "i-0abc123_pid_45678/neff_001.ntff",
+    "i-0abc123_pid_45678/neff_002.ntff"
+  ],
+  "timeout": 600,
+  "framework_profile": false
+}
+```
+
+**Example metadata.json for Standard mode:**
+
+```json
+{
+  "function": "test_inference",
+  "profiler": "NeuronProfiler",
+  "perfetto_mode": false,
+  "profile_files": [
+    "/tmp/profiles/profile_001.ntff",
+    "/tmp/profiles/profile_002.ntff"
+  ],
+  "timeout": 600,
+  "framework_profile": false
+}
+```
+
+**Converting NTFF to Perfetto Format:**
+
+```bash
+# Using neuron-profile CLI
+neuron-profile convert /tmp/profiles/i-*_pid_*/neff_*.ntff -o perfetto.json
+
+# Using neuron-workflow (for advanced analysis)
+# Requires neuron-workflow library installation
+# See: https://github.com/aws-neuron/neuron-workflow
+```
+
+**Troubleshooting:**
+
+- **No session directory created**: Ensure your code actually runs on Neuron hardware. The session directory is only created when Neuron runtime is invoked.
+- **Empty ntff_files in metadata**: The benchmark may not have executed long enough. Try increasing benchmark rounds or warmup rounds.
+- **Permission denied**: Check that the output_dir is writable by your user.
 
 ### Disable Profiling for Quick Tests
 

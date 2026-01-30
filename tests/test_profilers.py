@@ -237,3 +237,117 @@ class TestNeuronProfilerCacheManagement:
         metadata = profiler.get_metadata()
         assert metadata["clear_cache_before"] is True
         assert metadata["clear_cache_after"] is True
+
+
+class TestNeuronProfilerPerfettoMode:
+    """Tests for NeuronProfiler Perfetto mode."""
+
+    def test_perfetto_mode_sets_inspect_env_vars(self, temp_dir: Path, clean_env: None) -> None:
+        """Test that perfetto=True sets NEURON_RT_INSPECT_* variables."""
+        profiler = NeuronProfiler(output_dir=str(temp_dir), perfetto=True)
+        profiler.setup("test_func")
+
+        assert os.environ.get("NEURON_RT_INSPECT_ENABLE") == "1"
+        assert os.environ.get("NEURON_RT_INSPECT_SYSTEM_PROFILE") == "1"
+        assert os.environ.get("NEURON_RT_INSPECT_DEVICE_PROFILE") == "1"
+        assert os.environ.get("NEURON_RT_INSPECT_OUTPUT_DIR") == str(temp_dir)
+
+        # Standard mode vars should NOT be set
+        assert "NEURON_PROFILE" not in os.environ
+
+    def test_standard_mode_unchanged(self, temp_dir: Path, clean_env: None) -> None:
+        """Test that perfetto=False uses standard NEURON_PROFILE."""
+        profiler = NeuronProfiler(output_dir=str(temp_dir))
+        profiler.setup("test_func")
+
+        assert os.environ.get("NEURON_PROFILE") == str(temp_dir)
+
+        # Perfetto vars should NOT be set
+        assert "NEURON_RT_INSPECT_ENABLE" not in os.environ
+
+    def test_metadata_includes_session_dir_in_perfetto_mode(self, temp_dir: Path, clean_env: None) -> None:
+        """Test that metadata includes session_dir for perfetto mode."""
+        # Create mock session directory
+        session_dir = temp_dir / "i-instance_pid_1234"
+        session_dir.mkdir()
+
+        # Create mock NTFF file
+        (session_dir / "test.ntff").write_text("mock ntff data")
+
+        profiler = NeuronProfiler(output_dir=str(temp_dir), perfetto=True)
+        profiler.setup("test_func")
+
+        metadata = profiler.get_metadata()
+
+        assert metadata["perfetto_mode"] is True
+        assert "session_dir" in metadata
+        assert "i-instance_pid_1234" in metadata["session_dir"]
+        assert "ntff_files" in metadata
+        assert len(metadata["ntff_files"]) > 0
+
+    def test_teardown_cleans_both_modes_env_vars(self, temp_dir: Path, clean_env: None) -> None:
+        """Test that teardown cleans up all environment variables."""
+        profiler = NeuronProfiler(output_dir=str(temp_dir), perfetto=True)
+        profiler.setup("test_func")
+
+        # Verify vars are set
+        assert "NEURON_RT_INSPECT_ENABLE" in os.environ
+
+        profiler.teardown()
+
+        # Verify all vars are cleaned
+        assert "NEURON_RT_INSPECT_ENABLE" not in os.environ
+        assert "NEURON_RT_INSPECT_SYSTEM_PROFILE" not in os.environ
+        assert "NEURON_RT_INSPECT_DEVICE_PROFILE" not in os.environ
+        assert "NEURON_RT_INSPECT_OUTPUT_DIR" not in os.environ
+        assert "NEURON_PROFILE" not in os.environ
+
+    def test_standard_mode_metadata_includes_profile_files(self, temp_dir: Path, clean_env: None) -> None:
+        """Test that standard mode metadata includes profile_files."""
+        profiler = NeuronProfiler(output_dir=str(temp_dir))
+        profiler.setup("test_func")
+
+        # Create mock NTFF files
+        (temp_dir / "profile1.ntff").write_text("mock data")
+        (temp_dir / "profile2.ntff").write_text("mock data")
+
+        metadata = profiler.get_metadata()
+
+        assert metadata["perfetto_mode"] is False
+        assert "profile_files" in metadata
+        assert len(metadata["profile_files"]) == 2
+        assert "session_dir" not in metadata
+
+    def test_perfetto_mode_selects_newest_session_dir(self, temp_dir: Path, clean_env: None) -> None:
+        """Test that perfetto mode selects the newest session directory."""
+        # Create multiple session directories
+        old_session = temp_dir / "i-instance_pid_1000"
+        old_session.mkdir()
+        (old_session / "old.ntff").write_text("old")
+
+        # Make newer session
+        import time
+        time.sleep(0.01)
+        new_session = temp_dir / "i-instance_pid_2000"
+        new_session.mkdir()
+        (new_session / "new.ntff").write_text("new")
+
+        profiler = NeuronProfiler(output_dir=str(temp_dir), perfetto=True)
+        profiler.setup("test_func")
+
+        metadata = profiler.get_metadata()
+
+        # Should select the newer session
+        assert "i-instance_pid_2000" in metadata["session_dir"]
+        assert "new.ntff" in metadata["ntff_files"][0]
+
+    def test_perfetto_mode_handles_no_session_dirs(self, temp_dir: Path, clean_env: None) -> None:
+        """Test that perfetto mode handles missing session directories gracefully."""
+        profiler = NeuronProfiler(output_dir=str(temp_dir), perfetto=True)
+        profiler.setup("test_func")
+
+        metadata = profiler.get_metadata()
+
+        assert metadata["perfetto_mode"] is True
+        assert metadata["session_dir"] is None
+        assert metadata["ntff_files"] == []

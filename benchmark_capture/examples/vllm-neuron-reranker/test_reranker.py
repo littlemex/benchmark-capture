@@ -4,8 +4,17 @@ vLLM-Neuron Reranker Benchmark - Generic Implementation
 This test is designed to work with various Reranker models by using configuration
 from config.yaml. Customize the config file for your specific model.
 
+Features:
+- Perfetto mode enabled by default for NTFF generation
+- Session directory output: i-<instance>_pid_<number>/
+- NTFF files suitable for Perfetto UI visualization
+
 Run with:
     pytest test_reranker.py --benchmark-only --benchmark-json=results.json -v
+
+Output verification:
+    ls -la ./benchmarks/i-*_pid_*/        # Check session directory
+    cat ./benchmarks/metadata.json | jq  # Verify perfetto_mode: true
 """
 
 import csv
@@ -25,7 +34,7 @@ logger = logging.getLogger(__name__)
 @pytest.mark.benchmark(group="reranker")
 @pytest.mark.vllm
 @pytest.mark.neuron
-@profile()  # Auto-detect Neuron hardware
+@profile("neuron", perfetto=True)  # Enable Perfetto mode for NTFF generation
 def test_vllm_neuron_reranker(
     benchmark,
     model_path,
