@@ -12,3 +12,10 @@ output_dir = "{{ profiler_output_dir }}"
 timeout = {{ timeout }}
 # Enable framework profiling (torch profiler integration)
 framework_profile = true
+
+# Compilation cache management
+# Clear Neuron compilation cache before running benchmarks
+# WARNING: First run after clearing will recompile (10-15 minutes for large models)
+clear_cache_before = false
+# Clear cache after benchmarks (useful for CI/CD to save disk space)
+clear_cache_after = false

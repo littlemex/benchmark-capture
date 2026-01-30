@@ -168,3 +168,72 @@ class TestGetProfiler:
         profiler = get_profiler("neuron", output_dir=str(temp_dir), timeout=1200)
         assert profiler.output_dir == temp_dir
         assert profiler.options["timeout"] == 1200
+
+
+class TestNeuronProfilerCacheManagement:
+    """Tests for Neuron profiler cache management."""
+
+    def test_clear_cache_before_setup(self, temp_dir: Path, clean_env: None) -> None:
+        """Test cache clearing before benchmark."""
+        cache_dir = temp_dir / "cache"
+        cache_dir.mkdir()
+        (cache_dir / "model.neff").write_text("cached model")
+
+        os.environ["NEURON_COMPILE_CACHE_URL"] = str(cache_dir)
+
+        profiler = NeuronProfiler(
+            output_dir=str(temp_dir / "output"), clear_cache_before=True
+        )
+        profiler.setup("test_func")
+
+        # Cache should be cleared
+        assert cache_dir.exists()
+        assert len(list(cache_dir.iterdir())) == 0
+
+    def test_clear_cache_after_teardown(self, temp_dir: Path, clean_env: None) -> None:
+        """Test cache clearing after benchmark."""
+        cache_dir = temp_dir / "cache"
+        cache_dir.mkdir()
+        (cache_dir / "model.neff").write_text("cached model")
+
+        os.environ["NEURON_COMPILE_CACHE_URL"] = str(cache_dir)
+
+        profiler = NeuronProfiler(
+            output_dir=str(temp_dir / "output"), clear_cache_after=True
+        )
+        profiler.setup("test_func")
+
+        # Recreate file (simulating compilation during benchmark)
+        (cache_dir / "model.neff").write_text("new cached model")
+
+        profiler.teardown()
+
+        # Cache should be cleared after teardown
+        assert cache_dir.exists()
+        assert len(list(cache_dir.iterdir())) == 0
+
+    def test_no_cache_clearing_by_default(self, temp_dir: Path, clean_env: None) -> None:
+        """Test cache is not cleared by default."""
+        cache_dir = temp_dir / "cache"
+        cache_dir.mkdir()
+        (cache_dir / "model.neff").write_text("cached model")
+
+        os.environ["NEURON_COMPILE_CACHE_URL"] = str(cache_dir)
+
+        profiler = NeuronProfiler(output_dir=str(temp_dir / "output"))
+        profiler.setup("test_func")
+        profiler.teardown()
+
+        # Cache should still exist
+        assert (cache_dir / "model.neff").exists()
+
+    def test_metadata_includes_cache_settings(self, temp_dir: Path, clean_env: None) -> None:
+        """Test metadata includes cache clearing settings."""
+        profiler = NeuronProfiler(
+            output_dir=str(temp_dir), clear_cache_before=True, clear_cache_after=True
+        )
+        profiler.setup("test_func")
+
+        metadata = profiler.get_metadata()
+        assert metadata["clear_cache_before"] is True
+        assert metadata["clear_cache_after"] is True

@@ -55,3 +55,16 @@ benchmark:
   rounds: 5                         # Number of benchmark rounds
   warmup_rounds: 1                  # Number of warmup rounds
   num_test_queries: 10              # Number of queries to use for testing
+
+# Profiler settings (optional)
+profiler:
+  # Clear Neuron compilation cache before benchmark
+  # WARNING: First run after clearing will recompile (10-15 minutes)
+  # Useful when:
+  # - Model configuration changed (batch size, sequence length, etc.)
+  # - Neuron SDK version changed
+  # - Testing clean compilation performance
+  clear_cache_before: false
+
+  # Clear cache after benchmark (useful for CI/CD to save disk space)
+  clear_cache_after: false

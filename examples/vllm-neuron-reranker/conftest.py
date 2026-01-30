@@ -70,3 +70,12 @@ def token_ids(reranker_config):
         "true": reranker_config['token_true'],
         "false": reranker_config['token_false'],
     }
+
+
+@pytest.fixture(scope="session")
+def profiler_config(config):
+    """Profiler configuration for cache management."""
+    return config.get('profiler', {
+        'clear_cache_before': False,
+        'clear_cache_after': False,
+    })

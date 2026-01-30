@@ -161,6 +161,18 @@ reranker:
 
 First run takes 10-15 minutes. Compiled artifacts are cached for subsequent runs.
 
+**To clear cache:**
+Edit `config.yaml`:
+```yaml
+profiler:
+  clear_cache_before: true  # Clear cache before benchmark
+```
+
+Or manually:
+```bash
+sudo rm -rf /var/tmp/neuron-compile-cache/*
+```
+
 ### AttributeError: 'int' object has no attribute 'stats'
 
 Access statistics from `benchmark.stats` directly, not from the return value of `benchmark.pedantic()`.

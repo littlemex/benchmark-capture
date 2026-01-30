@@ -248,6 +248,12 @@ backend = "auto"  # Options: "auto", "neuron", "nsight", "noop"
 output_dir = "/tmp/neuron_profiles"
 timeout = 600
 
+# Compilation cache management (Neuron only)
+# Clear cache before benchmarks (useful when config changes)
+clear_cache_before = false
+# Clear cache after benchmarks (useful for CI/CD to save disk space)
+clear_cache_after = false
+
 [profiler.nsight]
 output_dir = "/tmp/nsight_profiles"
 cuda_api_trace = true
@@ -496,6 +502,65 @@ chmod +x run_benchmark.sh
 **Wrong venv path**
 - Check available environments: `ls /opt/ | grep neuronx_venv`
 - Use the vLLM-specific environment (contains `vllm` in the name)
+
+### Compilation Cache Management
+
+AWS Neuron SDK caches compiled models to speed up subsequent runs. However, the cache must be cleared when:
+- Model configuration changes (batch size, sequence length, tensor parallel size)
+- Neuron SDK version changes
+- Testing clean compilation performance
+
+**Cache Location:**
+- Default: `/var/tmp/neuron-compile-cache/`
+- Configured via: `NEURON_COMPILE_CACHE_URL` environment variable
+- vLLM artifacts: `NEURON_COMPILED_ARTIFACTS` environment variable
+
+**Automatic Cache Clearing:**
+
+Configure in `benchmark.toml`:
+```toml
+[profiler.neuron]
+# Clear cache before running benchmarks
+clear_cache_before = true  # Default: false
+# Clear cache after benchmarks (useful for CI/CD)
+clear_cache_after = false   # Default: false
+```
+
+**Manual Cache Clearing:**
+
+```python
+from benchmark_capture.cache import clear_neuron_cache
+
+# Clear cache manually
+result = clear_neuron_cache()
+print(f"Cleared {result['cache_size_mb']:.2f} MB from {result['cache_dir']}")
+```
+
+**Command Line:**
+```bash
+# Manual clearing (requires appropriate permissions)
+sudo rm -rf /var/tmp/neuron-compile-cache/*
+
+# Or clear vLLM artifacts
+rm -rf $NEURON_COMPILED_ARTIFACTS/*
+```
+
+**Important Notes:**
+- First run after clearing will recompile (10-15 minutes for large models)
+- Subsequent runs use cached graphs (much faster)
+- Cache size can grow to several GB
+- Clear cache in CI/CD to save disk space
+- Permission errors require `sudo` for system-wide cache
+
+**Cache Status Check:**
+
+```python
+from benchmark_capture.cache import check_cache_status
+
+status = check_cache_status()
+print(f"Cache: {status['cache_size_mb']:.2f} MB")
+print(f"Cached models: {status['cached_models_count']}")
+```
 
 ## Hardware-Agnostic Code
 

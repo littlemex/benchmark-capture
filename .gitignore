@@ -26,3 +26,4 @@ htmlcov/
 # Environments
 .env
 venv/
+pytest.log
