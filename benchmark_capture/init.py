@@ -85,7 +85,7 @@ class ProjectExample:
             )
 
         self.example_name = example_name
-        self.base_path = Path(__file__).parent.parent / "examples" / example_name
+        self.base_path = Path(__file__).parent / "examples" / example_name
 
         if not self.base_path.exists():
             raise FileNotFoundError(f"Example directory not found: {self.base_path}")
@@ -99,7 +99,7 @@ class ProjectExample:
             List of dictionaries with example metadata
         """
         examples = []
-        base_examples_path = Path(__file__).parent.parent / "examples"
+        base_examples_path = Path(__file__).parent / "examples"
 
         for example_name in cls.AVAILABLE_EXAMPLES:
             example_path = base_examples_path / example_name

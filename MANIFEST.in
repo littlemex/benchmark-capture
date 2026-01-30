@@ -1,0 +1,6 @@
+include README.md
+include LICENSE
+recursive-include benchmark_capture/templates *
+recursive-include benchmark_capture/examples *
+global-exclude __pycache__
+global-exclude *.py[co]
