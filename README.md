@@ -39,29 +39,28 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # Create virtual environment
 uv venv
 
-# Install from TestPyPI
+# Install from TestPyPI (latest: v0.2.0)
 uv pip install \
   --index-url https://test.pypi.org/simple/ \
-  benchmark-capture
-
-# With CLI support
-uv pip install click jinja2
+  --extra-index-url https://pypi.org/simple/ \
+  'benchmark-capture[init]==0.2.0'
 ```
 
 ### Using pip
 
 ```bash
-pip install benchmark-capture
+# Install from TestPyPI (latest: v0.2.0)
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ 'benchmark-capture==0.2.0'
 ```
 
 With project initialization support:
 ```bash
-pip install benchmark-capture[init]
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ 'benchmark-capture[init]==0.2.0'
 ```
 
 For development:
 ```bash
-git clone https://github.com/yourusername/benchmark-capture.git
+git clone https://github.com/littlemex/benchmark-capture.git
 cd benchmark-capture
 pip install -e ".[dev]"
 ```
@@ -77,7 +76,7 @@ pip install -e ".[dev]"
 source /opt/aws_neuronx_venv_pytorch_inference_vllm_0_13/bin/activate
 
 # 2. Install benchmark-capture (if not already installed)
-pip install --index-url https://test.pypi.org/simple/ benchmark-capture
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ 'benchmark-capture==0.2.0'
 pip install pytest pytest-benchmark
 ```
 
@@ -149,8 +148,8 @@ For AWS Inferentia/Trainium:
 source /opt/aws_neuronx_venv_pytorch_inference_vllm_0_13/bin/activate
 
 # 2. Install dependencies in Neuron venv
-pip install --index-url https://test.pypi.org/simple/ benchmark-capture
-pip install click jinja2 pytest pytest-benchmark
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ 'benchmark-capture[init]==0.2.0'
+pip install pytest pytest-benchmark
 
 # 3. Create vLLM-Neuron project
 benchmark-capture-init ./vllm-benchmarks --template vllm-neuron
@@ -168,8 +167,9 @@ For local development or GPU:
 # Install dependencies
 uv pip install \
   --index-url https://test.pypi.org/simple/ \
-  benchmark-capture
-uv pip install click jinja2 pytest pytest-benchmark
+  --extra-index-url https://pypi.org/simple/ \
+  'benchmark-capture[init]==0.2.0'
+uv pip install pytest pytest-benchmark
 
 # Create vLLM project (for NVIDIA GPU/CPU)
 benchmark-capture-init ./vllm-benchmarks --template vllm
@@ -185,7 +185,7 @@ benchmark-capture-init --list
 
 ```bash
 # Install with init support
-pip install benchmark-capture[init]
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ 'benchmark-capture[init]==0.2.0'
 
 # Create project
 benchmark-capture-init ./vllm-benchmarks --template vllm-neuron
@@ -234,6 +234,243 @@ cd my-reranker
 - **Template** = Starting structure (you add data/model)
 
 See `examples/` directory for browsing examples before deploying.
+
+### Complete End-to-End Example: vLLM-Neuron Reranker
+
+This walkthrough demonstrates the complete workflow from installation to running benchmarks on AWS Inferentia2.
+
+**Prerequisites:**
+- AWS Inferentia2 instance (inf2.xlarge or larger)
+- Hugging Face account with access to model
+
+**Step 1: Install benchmark-capture**
+
+```bash
+# Activate AWS Neuron vLLM environment
+source /opt/aws_neuronx_venv_pytorch_inference_vllm_0_13/bin/activate
+
+# Install from TestPyPI with init extras
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ 'benchmark-capture[init]'
+```
+
+**Step 2: Download Model from Hugging Face**
+
+```bash
+# Install huggingface-cli if not available
+pip install 'huggingface_hub[cli]'
+
+# Login with your Hugging Face token
+# Get your token from: https://huggingface.co/settings/tokens
+huggingface-cli login
+# Paste your token when prompted
+
+# Create models directory
+mkdir -p ~/models
+
+# Download Qwen3-Reranker model
+# Note: Check Hugging Face for the correct model repository name
+huggingface-cli download \
+  Alibaba-NLP/gte-Qwen3-0.6B-reranker \
+  --local-dir ~/models/Qwen3-0.6B-Reranker \
+  --local-dir-use-symlinks False
+
+# Verify download
+ls ~/models/Qwen3-0.6B-Reranker/
+# You should see: config.json, model.safetensors, tokenizer.json, etc.
+```
+
+**Step 3: Deploy Example**
+
+```bash
+# List available examples
+benchmark-capture-init --list-examples
+
+# Deploy the reranker example to your home directory
+benchmark-capture-init ~/reranker-benchmark --example vllm-neuron-reranker
+cd ~/reranker-benchmark
+
+# Verify files are deployed
+ls -la
+# You should see: config.yaml, test_reranker.py, input_sample.csv, etc.
+```
+
+**Step 4: Configure Model Path**
+
+The config.yaml contains a placeholder `{{ MODEL_PATH }}` that needs to be replaced with your actual model path.
+
+**Option A: Edit manually with your preferred editor**
+```bash
+# Open config.yaml in your editor
+vim config.yaml  # or nano, emacs, etc.
+
+# Find the line:
+#   path: "{{ MODEL_PATH }}"
+# Replace with your actual path:
+#   path: "/home/coder/models/Qwen3-0.6B-Reranker"
+```
+
+**Option B: Use sed for automatic replacement**
+```bash
+# Replace placeholder with actual path using sed
+sed -i 's|{{ MODEL_PATH }}|/home/coder/models/Qwen3-0.6B-Reranker|g' config.yaml
+
+# Verify the change
+grep "path:" config.yaml
+# Should show: path: "/home/coder/models/Qwen3-0.6B-Reranker"
+```
+
+**Verify configuration:**
+```bash
+# Check the model path is correctly set
+cat config.yaml | grep -A 2 "^model:"
+# Output should be:
+# model:
+#   # Path to the reranker model
+#   path: "/home/coder/models/Qwen3-0.6B-Reranker"
+```
+
+**Step 5: Install Dependencies**
+
+```bash
+pip install -r requirements.txt
+```
+
+**Step 6: Run Benchmark**
+
+```bash
+# Run with real-time logging (recommended for long-running benchmarks)
+pytest test_reranker.py --benchmark-only --benchmark-json=results.json -v
+
+# For quieter output (only show warnings and results)
+pytest test_reranker.py --benchmark-only --benchmark-json=results.json -v --log-cli-level=WARNING
+```
+
+**What You'll See:**
+- Model initialization and compilation (10-15 minutes first run)
+- Real-time progress updates during benchmark
+- Per-query latency metrics
+- Final benchmark results with statistics
+
+**Example Output:**
+```
+============================= test session starts ==============================
+test_reranker.py::test_vllm_neuron_reranker
+-------------------------------- live log call ---------------------------------
+INFO     test_reranker:test_reranker.py:51 Loaded 10 queries from input_sample.csv
+INFO     test_reranker:test_reranker.py:56 Initializing vLLM-Neuron reranker...
+INFO     test_reranker:test_reranker.py:57 Model: /path/to/Qwen3-0.6B-Reranker
+...
+PASSED
+
+----------------------- benchmark: 1 tests ------------------------
+Name (time in s)                     Min      Max     Mean   StdDev
+--------------------------------------------------------------------
+test_vllm_neuron_reranker         3.042    3.062    3.052    0.010
+--------------------------------------------------------------------
+```
+
+**Results:**
+- `results.json` - Detailed benchmark data with statistics
+  ```bash
+  # View summary
+  cat results.json | python3 -c "
+  import json, sys
+  b = json.load(sys.stdin)['benchmarks'][0]
+  print(f\"Mean: {b['stats']['mean']:.4f}s\")
+  print(f\"Throughput: {b['extra_info']['throughput_qps']:.2f} QPS\")
+  print(f\"Latency/query: {b['extra_info']['latency_per_query_ms']:.2f}ms\")
+  "
+  ```
+- Profile traces in `/tmp/profiles/` (configurable)
+  ```bash
+  # Check profile metadata
+  cat /tmp/profiles/metadata.json
+  ```
+
+**Neuron Cache Management:**
+
+First run will compile the model (10-15 minutes). Subsequent runs reuse the cache. To clear cache:
+
+```yaml
+# In config.yaml, set:
+profiler:
+  clear_cache_before: true  # Recompile on next run
+  clear_cache_after: false  # Keep cache for future runs
+```
+
+**Note:** Cache clearing is useful when:
+- Model configuration changed (batch size, max length, etc.)
+- Neuron SDK version updated
+- Testing clean compilation performance
+
+### Troubleshooting
+
+**Problem: Model not found or 404 error during download**
+```bash
+# Error: Repository Not Found for url: https://huggingface.co/...
+
+# Solution 1: Check the exact model name on Hugging Face
+# Search for the model on https://huggingface.co/models
+# Copy the exact repository name (e.g., "Alibaba-NLP/gte-Qwen3-0.6B-reranker")
+
+# Solution 2: Verify you're logged in with correct token
+huggingface-cli whoami
+huggingface-cli login --token YOUR_TOKEN
+
+# Solution 3: Check if the model requires access request
+# Some models need you to request access on the Hugging Face website first
+```
+
+**Problem: Config path not updated ({{ MODEL_PATH }} still showing)**
+```bash
+# Verify the path replacement worked
+grep "{{ MODEL_PATH }}" config.yaml
+# If this returns a match, the placeholder is still there
+
+# Fix: Manually edit or re-run sed
+sed -i 's|{{ MODEL_PATH }}|/home/coder/models/Qwen3-0.6B-Reranker|g' config.yaml
+
+# Important: Use your actual model path, not the example path
+# Check where you downloaded the model:
+ls ~/models/
+```
+
+**Problem: Permission denied when installing benchmark-capture**
+```bash
+# Error: Permission denied: '/opt/aws_neuronx_venv_pytorch_inference_vllm_0_13/bin/...'
+
+# Solution: The package is already installed but an older version
+# Check current version:
+python3 -c "import benchmark_capture; print(benchmark_capture.__version__)"
+
+# For testing, use local development install:
+cd /path/to/benchmark-capture
+pip install -e .
+```
+
+**Problem: Model compilation takes too long**
+```bash
+# First compilation can take 10-15 minutes - this is normal!
+# The model is being compiled to Neuron format.
+
+# Check compilation progress:
+# Look for log messages like:
+# INFO Neuron:model_builder.py:... Generating HLOs for the following models...
+
+# Subsequent runs will be much faster (seconds) as they reuse cached compilation
+```
+
+**Problem: ImportError or ModuleNotFoundError**
+```bash
+# Make sure you're in the Neuron venv
+source /opt/aws_neuronx_venv_pytorch_inference_vllm_0_13/bin/activate
+
+# Verify required packages
+pip list | grep -E "pytest|vllm|benchmark"
+
+# Install missing dependencies
+pip install -r requirements.txt
+```
 
 ## Supported Profilers
 
@@ -661,7 +898,7 @@ Each profiling run saves metadata:
 Using uv (recommended):
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/benchmark-capture.git
+git clone https://github.com/littlemex/benchmark-capture.git
 cd benchmark-capture
 
 # Create virtual environment

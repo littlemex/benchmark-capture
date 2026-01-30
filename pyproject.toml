@@ -1,14 +1,15 @@
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "benchmark-capture"
-version = "0.2.0"
+version = "0.2.1"
 description = "Lightweight profiling decorator for pytest-benchmark"
 readme = "README.md"
 requires-python = ">=3.9"
-license = {file = "LICENSE"}
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 authors = [
     {name = "benchmark-capture contributors"}
 ]
@@ -43,9 +44,9 @@ init = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/benchmark-capture"
-Repository = "https://github.com/yourusername/benchmark-capture"
-Issues = "https://github.com/yourusername/benchmark-capture/issues"
+Homepage = "https://github.com/littlemex/benchmark-capture"
+Repository = "https://github.com/littlemex/benchmark-capture"
+Issues = "https://github.com/littlemex/benchmark-capture/issues"
 
 [project.scripts]
 benchmark-capture-init = "benchmark_capture.cli_init:init_cmd"
