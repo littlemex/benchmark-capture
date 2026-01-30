@@ -1,0 +1,18 @@
+# vLLM-Neuron Reranker Benchmark Requirements
+
+# Core dependencies
+pytest>=9.0.0
+pytest-benchmark>=5.2.0
+pyyaml>=6.0
+
+# vLLM with Neuron support (pre-installed in AWS Neuron venv)
+# vllm>=0.13.0
+
+# benchmark-capture (install from source)
+# pip install -e /path/to/benchmark-capture
+
+# Transformers (for tokenizer)
+# transformers>=4.51.0
+
+# Note: This example assumes you're using the AWS Neuron venv:
+# source /opt/aws_neuronx_venv_pytorch_inference_vllm_0_13/bin/activate

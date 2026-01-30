@@ -1,0 +1,57 @@
+# vLLM-Neuron Reranker Benchmark Configuration
+
+# Model configuration
+model:
+  # Path to the reranker model
+  # Example: "/home/coder/data-science/investigations/inf2-vllm-performance/models/Qwen3-0.6B-Reranker"
+  path: "{{ MODEL_PATH }}"
+
+# vLLM-Neuron engine settings
+vllm:
+  tensor_parallel_size: 2           # Number of NeuronCores
+  max_num_seqs: 4                   # Batch size
+  block_size: 32                    # KV cache block size (32 for Zenn best case, 128 for stability)
+  max_model_len: 2048               # Maximum sequence length
+  max_num_batched_tokens: 256       # Performance optimization
+  num_gpu_blocks_override: 512      # pa_num_blocks equivalent
+  enable_prefix_caching: false      # Explicit disable
+  dtype: "bfloat16"                 # Data type
+
+# Reranker-specific settings
+reranker:
+  # Input data
+  input_file: "input_sample.csv"    # CSV file with queries and candidates
+
+  # Processing parameters
+  search_num: 20                    # Number of candidates per query to process
+  batch_size: 8                     # Batch size for processing prompts
+  max_length: 1500                  # Maximum prompt length
+
+  # Model-specific tokens (for Qwen3-Reranker)
+  # Change these for other reranker models
+  token_true: "yes"
+  token_false: "no"
+
+  # Prompt templates (for Qwen3-Reranker)
+  # Customize these for your model
+  prefix: |
+    <|im_start|>system
+    Judge whether the Document meets the requirements based on the Query and the Instruct provided. Note that the answer can only be "yes" or "no".<|im_end|>
+    <|im_start|>user
+
+  # Note: "assitant" typo is intentional for Qwen3-Reranker compatibility
+  suffix: |
+    <|im_end|>
+    <|im_start|>assitant
+    <think>
+
+    </think>
+
+
+  instruction: "Given a web search query, retrieve relevant passages that answer the query"
+
+# Benchmark settings
+benchmark:
+  rounds: 5                         # Number of benchmark rounds
+  warmup_rounds: 1                  # Number of warmup rounds
+  num_test_queries: 10              # Number of queries to use for testing

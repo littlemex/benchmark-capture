@@ -30,6 +30,26 @@ The core `@profile()` decorator is general-purpose, but templates and documentat
 
 ## Installation
 
+### Using uv (Recommended - 100x faster)
+
+```bash
+# Install uv if not already installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Create virtual environment
+uv venv
+
+# Install from TestPyPI
+uv pip install \
+  --index-url https://test.pypi.org/simple/ \
+  benchmark-capture
+
+# With CLI support
+uv pip install click jinja2
+```
+
+### Using pip
+
 ```bash
 pip install benchmark-capture
 ```
@@ -48,7 +68,22 @@ pip install -e ".[dev]"
 
 ## Quick Start
 
-### vLLM Example (Primary Use Case)
+### vLLM-Neuron Example (AWS Inferentia/Trainium)
+
+**IMPORTANT**: vLLM-Neuron requires AWS Neuron SDK virtual environment.
+
+```bash
+# 1. Activate AWS Neuron vLLM environment
+source /opt/aws_neuronx_venv_pytorch_inference_vllm_0_13/bin/activate
+
+# 2. Install benchmark-capture (if not already installed)
+pip install --index-url https://test.pypi.org/simple/ benchmark-capture
+pip install pytest pytest-benchmark
+```
+
+**Note**: The path `/opt/aws_neuronx_venv_pytorch_inference_vllm_0_13` may vary. Check `/opt/` for available Neuron environments.
+
+Write your test:
 
 ```python
 import pytest
@@ -56,9 +91,15 @@ import vllm
 from benchmark_capture import profile
 
 @pytest.mark.benchmark
-@profile()  # Auto-detects hardware and profiles accordingly
-def test_vllm_inference(benchmark):
-    llm = vllm.LLM(model="model_path")
+@profile()  # Auto-detects Neuron hardware and profiles accordingly
+def test_vllm_neuron_inference(benchmark, model_path):
+    # vLLM-Neuron configuration
+    llm = vllm.LLM(
+        model=model_path,
+        device="neuron",
+        tensor_parallel_degree=2
+    )
+
     result = benchmark(llm.generate, ["test prompt"])
     benchmark.extra_info["throughput"] = len(result) / benchmark.stats.stats.mean
 ```
@@ -66,6 +107,23 @@ def test_vllm_inference(benchmark):
 Run with pytest-benchmark:
 ```bash
 pytest test_vllm.py --benchmark-only --benchmark-json=results.json
+```
+
+### vLLM Example (NVIDIA GPU)
+
+For GPU benchmarking, no special environment setup needed:
+
+```python
+import pytest
+import vllm
+from benchmark_capture import profile
+
+@pytest.mark.benchmark
+@profile()  # Auto-detects CUDA and uses NSight profiler
+def test_vllm_gpu_inference(benchmark):
+    llm = vllm.LLM(model="model_path", tensor_parallel_size=1)
+    result = benchmark(llm.generate, ["test prompt"])
+    benchmark.extra_info["throughput"] = len(result) / benchmark.stats.stats.mean
 ```
 
 ### General Python Function
@@ -82,12 +140,36 @@ def test_general_computation(benchmark):
 
 Scaffold a new benchmark project with vLLM-focused templates:
 
-```bash
-# Install with init support
-pip install benchmark-capture[init]
+### Using uv with AWS Neuron
 
-# Create vLLM-Neuron project (recommended for AWS Inferentia)
+For AWS Inferentia/Trainium:
+
+```bash
+# 1. Activate Neuron environment first
+source /opt/aws_neuronx_venv_pytorch_inference_vllm_0_13/bin/activate
+
+# 2. Install dependencies in Neuron venv
+pip install --index-url https://test.pypi.org/simple/ benchmark-capture
+pip install click jinja2 pytest pytest-benchmark
+
+# 3. Create vLLM-Neuron project
 benchmark-capture-init ./vllm-benchmarks --template vllm-neuron
+
+# 4. Run benchmarks
+cd vllm-benchmarks
+pytest --benchmark-only
+```
+
+### Using uv (General)
+
+For local development or GPU:
+
+```bash
+# Install dependencies
+uv pip install \
+  --index-url https://test.pypi.org/simple/ \
+  benchmark-capture
+uv pip install click jinja2 pytest pytest-benchmark
 
 # Create vLLM project (for NVIDIA GPU/CPU)
 benchmark-capture-init ./vllm-benchmarks --template vllm
@@ -97,6 +179,16 @@ benchmark-capture-init ./benchmarks --template basic
 
 # List available templates
 benchmark-capture-init --list
+```
+
+### Using pip
+
+```bash
+# Install with init support
+pip install benchmark-capture[init]
+
+# Create project
+benchmark-capture-init ./vllm-benchmarks --template vllm-neuron
 ```
 
 **Available templates:**
@@ -195,6 +287,83 @@ export BENCHMARK_PROFILER=noop
 pytest tests/
 ```
 
+## AWS Neuron Environment Setup
+
+**CRITICAL**: When using vLLM-Neuron on AWS Inferentia/Trainium, you **MUST** activate the Neuron SDK virtual environment before running benchmarks.
+
+### Why is this required?
+
+- vLLM-Neuron depends on AWS Neuron SDK (`torch_neuronx`, `neuronx-cc`)
+- These packages are pre-installed in `/opt/aws_neuronx_venv_*` on Neuron instances
+- The Neuron SDK cannot be installed via standard `pip install`
+
+### Setup Steps
+
+```bash
+# 1. Check available Neuron environments
+ls /opt/ | grep neuronx_venv
+
+# Common paths:
+# - /opt/aws_neuronx_venv_pytorch_inference_vllm_0_13  (vLLM 0.13)
+# - /opt/aws_neuronx_venv_pytorch_2_9                 (PyTorch 2.9)
+
+# 2. Activate the vLLM-Neuron environment
+source /opt/aws_neuronx_venv_pytorch_inference_vllm_0_13/bin/activate
+
+# 3. Verify activation
+which python3  # Should show /opt/aws_neuronx_venv_*/bin/python3
+python3 -c "import torch_neuronx; print('✓ Neuron SDK available')"
+
+# 4. Install benchmark-capture (AFTER activation)
+pip install --index-url https://test.pypi.org/simple/ benchmark-capture
+pip install pytest pytest-benchmark
+
+# 5. Run benchmarks
+pytest --benchmark-only
+```
+
+### Alternative: Shell Script Wrapper
+
+Create a wrapper script to ensure Neuron environment is activated:
+
+```bash
+#!/bin/bash
+# run_benchmark.sh
+
+set -e
+
+NEURON_VENV="/opt/aws_neuronx_venv_pytorch_inference_vllm_0_13"
+
+if [ ! -f "$NEURON_VENV/bin/activate" ]; then
+    echo "Error: Neuron venv not found at $NEURON_VENV"
+    exit 1
+fi
+
+echo "Activating Neuron environment..."
+source "$NEURON_VENV/bin/activate"
+
+echo "Running benchmarks..."
+pytest "$@"
+```
+
+Usage:
+```bash
+chmod +x run_benchmark.sh
+./run_benchmark.sh --benchmark-only -v
+```
+
+### Troubleshooting
+
+**Error: `ModuleNotFoundError: No module named 'torch_neuronx'`**
+- Solution: Activate Neuron venv before running tests
+
+**Error: `vllm` not found**
+- Solution: Use `/opt/aws_neuronx_venv_pytorch_inference_vllm_*` (includes vLLM)
+
+**Wrong venv path**
+- Check available environments: `ls /opt/ | grep neuronx_venv`
+- Use the vLLM-specific environment (contains `vllm` in the name)
+
 ## Hardware-Agnostic Code
 
 Write once, run anywhere:
@@ -262,6 +431,20 @@ Each profiling run saves metadata:
 
 ### Setup Development Environment
 
+Using uv (recommended):
+```bash
+# Clone repository
+git clone https://github.com/yourusername/benchmark-capture.git
+cd benchmark-capture
+
+# Create virtual environment
+uv venv
+
+# Install in editable mode with dev dependencies
+uv pip install -e ".[dev]"
+```
+
+Using pip:
 ```bash
 pip install -e ".[dev]"
 ```

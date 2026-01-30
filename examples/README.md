@@ -76,6 +76,22 @@ AWS Neuron profiling examples (requires Inferentia):
 pytest examples/test_with_neuron.py --benchmark-only -v
 ```
 
+### 4. vllm-neuron-reranker/
+Complete vLLM-Neuron Reranker benchmark example:
+- Generic implementation for any Reranker model
+- Configuration-driven design (config.yaml)
+- Per-query latency metrics
+- CSV data input with batch processing
+- Qwen3-Reranker compatible out-of-the-box
+
+See [vllm-neuron-reranker/README.md](vllm-neuron-reranker/README.md) for details.
+
+```bash
+cd examples/vllm-neuron-reranker
+# Edit config.yaml with your model path
+pytest test_reranker.py --benchmark-only -v
+```
+
 ## Profiler Selection
 
 ### Auto-Detection (Recommended)

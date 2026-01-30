@@ -40,10 +40,15 @@ def test_vllm_neuron_inference(benchmark, model_path, vllm_config, sample_prompt
 
         # Custom metrics
         num_outputs = len(outputs)
-        duration = benchmark.stats.stats.mean
-        benchmark.extra_info["throughput_qps"] = num_outputs / duration
+        duration_s = benchmark.stats.stats.mean
+        duration_ms = duration_s * 1000
+        latency_per_prompt_ms = duration_ms / len(sample_prompts)
+
+        benchmark.extra_info["total_duration_ms"] = duration_ms
+        benchmark.extra_info["latency_per_prompt_ms"] = latency_per_prompt_ms
+        benchmark.extra_info["throughput_qps"] = num_outputs / duration_s
         benchmark.extra_info["num_prompts"] = len(sample_prompts)
-        benchmark.extra_info["tensor_parallel_degree"] = vllm_config["tensor_parallel_degree"]
+        benchmark.extra_info["tensor_parallel_size"] = vllm_config["tensor_parallel_size"]
 
         assert len(outputs) == len(sample_prompts)
 
@@ -61,7 +66,7 @@ def test_vllm_neuron_tensor_parallel(benchmark, model_path, vllm_config, tp_degr
 
     def setup():
         config = vllm_config.copy()
-        config["tensor_parallel_degree"] = tp_degree
+        config["tensor_parallel_size"] = tp_degree
         llm = vllm.LLM(model=model_path, **config)
         prompts = ["Test prompt for tensor parallel benchmark"]
         return llm, prompts
@@ -81,7 +86,7 @@ def test_vllm_neuron_tensor_parallel(benchmark, model_path, vllm_config, tp_degr
         outputs = benchmark(run_inference, llm, prompts)
 
         # Metrics
-        benchmark.extra_info["tensor_parallel_degree"] = tp_degree
+        benchmark.extra_info["tensor_parallel_size"] = tp_degree
         benchmark.extra_info["throughput_qps"] = len(outputs) / benchmark.stats.stats.mean
 
         assert len(outputs) == len(prompts)
@@ -122,7 +127,7 @@ def test_vllm_neuron_batch_sizes(benchmark, model_path, vllm_config, batch_size)
         # Metrics
         benchmark.extra_info["batch_size"] = batch_size
         benchmark.extra_info["throughput_qps"] = len(outputs) / benchmark.stats.stats.mean
-        benchmark.extra_info["tensor_parallel_degree"] = vllm_config["tensor_parallel_degree"]
+        benchmark.extra_info["tensor_parallel_size"] = vllm_config["tensor_parallel_size"]
 
         assert len(outputs) == batch_size
 

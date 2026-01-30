@@ -11,15 +11,14 @@ def model_path():
 
 @pytest.fixture(scope="session")
 def vllm_config():
-    """vLLM-Neuron configuration."""
+    """vLLM-Neuron configuration (vLLM 0.13+ compatible)."""
     return {
         # Neuron-specific settings
-        "tensor_parallel_degree": 2,  # Number of NeuronCores
+        "tensor_parallel_size": 2,  # Number of NeuronCores (correct parameter name for vLLM 0.13+)
         "max_num_seqs": 4,  # Batch size
         "block_size": 128,  # KV cache block size
         "max_model_len": 2048,  # Maximum sequence length
-        # Device setting
-        "device": "neuron",
+        # Note: "device" parameter is auto-detected by vLLM and should not be specified
     }
 
 
