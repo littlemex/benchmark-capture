@@ -219,6 +219,46 @@ class TestCliInit:
         assert "Error" in result.output
 
 
+    def test_init_with_example(self, tmp_path: Path) -> None:
+        """Test init with example."""
+        runner = CliRunner()
+
+        with runner.isolated_filesystem(temp_dir=tmp_path) as td:
+            result = runner.invoke(
+                init_cmd, ["my-reranker", "--example", "vllm-neuron-reranker"]
+            )
+            target = Path(td) / "my-reranker"
+
+            assert result.exit_code == 0
+            assert "Example deployed successfully" in result.output
+            assert target.exists()
+            assert (target / "test_reranker.py").exists()
+            assert (target / "config.yaml").exists()
+            assert (target / "input_sample.csv").exists()
+
+    def test_init_list_examples(self) -> None:
+        """Test listing examples."""
+        runner = CliRunner()
+        result = runner.invoke(init_cmd, ["--list-examples"])
+
+        assert result.exit_code == 0
+        assert "Available examples:" in result.output
+        assert "vllm-neuron-reranker" in result.output
+
+    def test_init_example_and_template_mutually_exclusive(self, tmp_path: Path) -> None:
+        """Test that example and template options are mutually exclusive."""
+        runner = CliRunner()
+
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            result = runner.invoke(
+                init_cmd,
+                ["test-project", "--template", "basic", "--example", "vllm-neuron-reranker"],
+            )
+
+        assert result.exit_code == 1
+        assert "Cannot use both" in result.output
+
+
 @pytest.mark.skipif(CLICK_AVAILABLE, reason="Testing fallback when Click not installed")
 class TestCliInitWithoutClick:
     """Tests for CLI when Click is not installed."""

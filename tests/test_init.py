@@ -6,9 +6,12 @@ from typing import Any, Dict
 import pytest
 
 from benchmark_capture.init import (
+    ProjectExample,
     ProjectTemplate,
     TemplateConfig,
+    init_example,
     init_project,
+    list_examples,
     list_templates,
 )
 
@@ -230,3 +233,92 @@ def test_list_templates_function(capsys: Any) -> None:
     assert "basic" in captured.out
     assert "vllm" in captured.out
     assert "minimal" in captured.out
+
+
+class TestProjectExample:
+    """Tests for ProjectExample."""
+
+    def test_list_examples(self) -> None:
+        """Test listing available examples."""
+        examples = ProjectExample.list_examples()
+        assert len(examples) > 0
+        assert any(ex["name"] == "vllm-neuron-reranker" for ex in examples)
+
+    def test_create_example_instance(self) -> None:
+        """Test creating ProjectExample instance."""
+        example = ProjectExample("vllm-neuron-reranker")
+        assert example.example_name == "vllm-neuron-reranker"
+        assert example.base_path.exists()
+
+    def test_invalid_example_raises_error(self) -> None:
+        """Test invalid example name raises error."""
+        with pytest.raises(ValueError, match="Unknown example"):
+            ProjectExample("invalid-example")
+
+    def test_copy_example(self, tmp_path: Path) -> None:
+        """Test copying example to target directory."""
+        target = tmp_path / "my-reranker"
+        example = ProjectExample("vllm-neuron-reranker")
+        created_files = example.copy_to(target)
+
+        assert target.exists()
+        assert len(created_files) > 0
+        # Check key files exist
+        assert (target / "test_reranker.py").exists()
+        assert (target / "config.yaml").exists()
+        assert (target / "conftest.py").exists()
+        assert (target / "input_sample.csv").exists()
+        assert (target / "README.md").exists()
+
+    def test_copy_example_existing_directory_no_overwrite(self, tmp_path: Path) -> None:
+        """Test copying example fails when directory exists and overwrite=False."""
+        target = tmp_path / "existing"
+        target.mkdir()
+        (target / "existing_file.txt").write_text("existing")
+
+        example = ProjectExample("vllm-neuron-reranker")
+
+        with pytest.raises(FileExistsError):
+            example.copy_to(target, overwrite=False)
+
+    def test_copy_example_with_overwrite(self, tmp_path: Path) -> None:
+        """Test copying example with overwrite=True."""
+        target = tmp_path / "existing"
+        target.mkdir()
+        (target / "existing_file.txt").write_text("existing")
+
+        example = ProjectExample("vllm-neuron-reranker")
+        created_files = example.copy_to(target, overwrite=True)
+
+        assert len(created_files) > 0
+        assert (target / "test_reranker.py").exists()
+
+
+class TestInitExample:
+    """Tests for init_example function."""
+
+    def test_init_example_default(self, tmp_path: Path) -> None:
+        """Test init_example with default settings."""
+        target = tmp_path / "my-reranker"
+        created = init_example(path=str(target), example="vllm-neuron-reranker")
+
+        assert target.exists()
+        assert len(created) > 0
+        assert (target / "test_reranker.py").exists()
+        assert (target / "config.yaml").exists()
+        assert (target / "input_sample.csv").exists()
+
+    def test_init_example_invalid_example(self, tmp_path: Path) -> None:
+        """Test init_example with invalid example name."""
+        target = tmp_path / "invalid"
+
+        with pytest.raises(ValueError, match="Unknown example"):
+            init_example(path=str(target), example="invalid")
+
+
+def test_list_examples_function(capsys: Any) -> None:
+    """Test list_examples function."""
+    list_examples()
+    captured = capsys.readouterr()
+    assert "Available examples:" in captured.out
+    assert "vllm-neuron-reranker" in captured.out

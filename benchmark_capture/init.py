@@ -63,6 +63,110 @@ class TemplateConfig:
         }
 
 
+class ProjectExample:
+    """Project example manager."""
+
+    AVAILABLE_EXAMPLES = ["vllm-neuron-reranker"]
+
+    def __init__(self, example_name: str):
+        """
+        Initialize project example.
+
+        Args:
+            example_name: Example name (vllm-neuron-reranker)
+
+        Raises:
+            ValueError: If example name is unknown
+        """
+        if example_name not in self.AVAILABLE_EXAMPLES:
+            raise ValueError(
+                f"Unknown example: {example_name}. "
+                f"Available: {', '.join(self.AVAILABLE_EXAMPLES)}"
+            )
+
+        self.example_name = example_name
+        self.base_path = Path(__file__).parent.parent / "examples" / example_name
+
+        if not self.base_path.exists():
+            raise FileNotFoundError(f"Example directory not found: {self.base_path}")
+
+    @classmethod
+    def list_examples(cls) -> List[Dict[str, str]]:
+        """
+        List available examples.
+
+        Returns:
+            List of dictionaries with example metadata
+        """
+        examples = []
+        base_examples_path = Path(__file__).parent.parent / "examples"
+
+        for example_name in cls.AVAILABLE_EXAMPLES:
+            example_path = base_examples_path / example_name
+            readme_path = example_path / "README.md"
+
+            # Extract description from README
+            description = "No description available"
+            if readme_path.exists():
+                with open(readme_path) as f:
+                    lines = f.readlines()
+                    # Look for first non-empty line after title
+                    for i, line in enumerate(lines):
+                        if line.startswith("#"):
+                            # Get next non-empty line
+                            for j in range(i + 1, min(i + 5, len(lines))):
+                                desc_line = lines[j].strip()
+                                if desc_line and not desc_line.startswith("#"):
+                                    description = desc_line
+                                    break
+                            break
+
+            examples.append({"name": example_name, "description": description})
+
+        return examples
+
+    def copy_to(self, target_path: Path, overwrite: bool = False) -> List[str]:
+        """
+        Copy example to target directory.
+
+        Args:
+            target_path: Target directory path
+            overwrite: If True, overwrite existing files
+
+        Returns:
+            List of created file paths (relative to target)
+
+        Raises:
+            FileExistsError: If target exists and overwrite is False
+        """
+        # Check if target exists
+        if target_path.exists() and not overwrite:
+            existing_files = list(target_path.glob("*"))
+            if existing_files:
+                raise FileExistsError(f"Directory {target_path} already exists and is not empty")
+
+        # Create target directory
+        target_path.mkdir(parents=True, exist_ok=True)
+
+        # Copy all files from example
+        created_files = []
+
+        for item in self.base_path.rglob("*"):
+            if item.is_file():
+                # Calculate relative path
+                rel_path = item.relative_to(self.base_path)
+                target_file = target_path / rel_path
+
+                # Create parent directories
+                target_file.parent.mkdir(parents=True, exist_ok=True)
+
+                # Copy file
+                shutil.copy2(item, target_file)
+                created_files.append(str(target_path.name / rel_path))
+
+        return sorted(created_files)
+
+
 class ProjectTemplate:
     """Project template manager."""
 
@@ -240,3 +344,41 @@ def list_templates() -> None:
     print("Available templates:")
     for tmpl in templates:
         print(f"  {tmpl['name']:10s} - {tmpl['description']}")
+
+
+def init_example(
+    path: str,
+    example: str,
+    overwrite: bool = False,
+) -> List[str]:
+    """
+    Initialize a project from an example.
+
+    Args:
+        path: Target directory path
+        example: Example name (vllm-neuron-reranker)
+        overwrite: If True, overwrite existing files
+
+    Returns:
+        List of created file paths (relative to target)
+
+    Raises:
+        FileExistsError: If directory exists and overwrite is False
+        ValueError: If example name is unknown
+
+    Examples:
+        >>> init_example(
+        ...     path="./my-reranker-benchmark",
+        ...     example="vllm-neuron-reranker"
+        ... )
+    """
+    example_obj = ProjectExample(example)
+    return example_obj.copy_to(Path(path), overwrite)
+
+
+def list_examples() -> None:
+    """Print available examples."""
+    examples = ProjectExample.list_examples()
+    print("Available examples:")
+    for ex in examples:
+        print(f"  {ex['name']:20s} - {ex['description']}")

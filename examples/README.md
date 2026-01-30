@@ -2,7 +2,29 @@
 
 This directory contains example benchmarks demonstrating benchmark-capture usage.
 
-## Project Initialization
+## Quick Start: Deploy Examples
+
+**Want to run a complete benchmark immediately?** Deploy an example:
+
+```bash
+# List available examples
+benchmark-capture-init --list-examples
+
+# Deploy vLLM-Neuron Reranker (includes sample data!)
+benchmark-capture-init ./my-reranker --example vllm-neuron-reranker
+
+cd my-reranker
+# Edit config.yaml, then run
+pytest test_reranker.py --benchmark-only -v
+```
+
+Examples are **production-ready** with:
+- ✅ Sample data included (CSV, configs, etc.)
+- ✅ Complete working code
+- ✅ Detailed documentation
+- ✅ Just add model and run!
+
+## Project Initialization from Templates
 
 Start a new benchmark project using templates:
 

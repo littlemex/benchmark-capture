@@ -138,7 +138,7 @@ def test_general_computation(benchmark):
 
 ## Project Initialization
 
-Scaffold a new benchmark project with vLLM-focused templates:
+Scaffold a new benchmark project from templates or deploy ready-to-use examples.
 
 ### Using uv with AWS Neuron
 
@@ -204,7 +204,36 @@ Each template creates a ready-to-use project with:
 - `test_*.py` - Example benchmarks
 - `README.md` - Template-specific documentation
 
-See `examples/` directory for real-world usage examples.
+### Deploy Ready-to-Use Examples
+
+For quick start with real-world benchmarks, deploy complete examples:
+
+```bash
+# List available examples
+benchmark-capture-init --list-examples
+
+# Deploy vLLM-Neuron Reranker example (includes CSV data!)
+benchmark-capture-init ./my-reranker --example vllm-neuron-reranker
+
+# Follow example-specific setup
+cd my-reranker
+# 1. Activate Neuron venv
+# 2. Edit config.yaml (set MODEL_PATH)
+# 3. Run: pytest test_reranker.py --benchmark-only -v
+```
+
+**Available examples:**
+- **vllm-neuron-reranker** - Complete Qwen3-Reranker benchmark
+  - Includes sample CSV data (10 queries, 20 candidates each)
+  - Configuration-driven (config.yaml)
+  - Production-ready code
+  - Just download model from Hugging Face and run!
+
+**Example vs Template:**
+- **Example** = Complete, runnable benchmark (data included)
+- **Template** = Starting structure (you add data/model)
+
+See `examples/` directory for browsing examples before deploying.
 
 ## Supported Profilers
 
