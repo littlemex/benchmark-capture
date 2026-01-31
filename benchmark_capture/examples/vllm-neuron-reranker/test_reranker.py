@@ -23,18 +23,20 @@ import logging
 from pathlib import Path
 
 import pytest
-import vllm
-from vllm import SamplingParams
 from benchmark_capture import profile
 
 # Configure logging for real-time progress updates
 logger = logging.getLogger(__name__)
 
+# NOTE: vLLM must be imported AFTER profiling environment is set up.
+# Import is moved to test function to ensure NEURON_RT_INSPECT_* env vars are set first.
+# This is critical for NTFF profile generation to work correctly.
+
 
 @pytest.mark.benchmark(group="reranker")
 @pytest.mark.vllm
 @pytest.mark.neuron
-@profile("neuron", perfetto=True)  # Enable Perfetto mode for NTFF generation
+@profile("neuron", perfetto=True, output_dir="profile_output")  # Enable Perfetto mode for NTFF generation
 def test_vllm_neuron_reranker(
     benchmark,
     model_path,
@@ -45,6 +47,10 @@ def test_vllm_neuron_reranker(
     token_ids,
 ):
     """Generic vLLM-Neuron reranker benchmark."""
+
+    # Import vLLM here to ensure profiling env vars are set first
+    import vllm
+    from vllm import SamplingParams
 
     # Load CSV data
     csv_file = Path(__file__).parent / reranker_config['input_file']

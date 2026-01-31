@@ -3,13 +3,20 @@ vLLM-Neuron benchmark tests for {{ project_name }}.
 
 Run with:
     pytest --benchmark-only -v
+
+IMPORTANT: vLLM must be imported INSIDE test functions, not at module level.
+This ensures profiling environment variables are set before Neuron runtime initialization.
 """
 
 import gc
 
 import pytest
-import vllm
 from benchmark_capture import profile
+
+# NOTE: vLLM import moved to test functions to ensure profiling works correctly.
+# The Neuron runtime reads NEURON_RT_INSPECT_* environment variables only at
+# initialization time. The @profile decorator sets these variables, so vLLM
+# must be imported AFTER the decorator activates.
 
 
 @pytest.mark.benchmark(group="inference")
@@ -18,6 +25,9 @@ from benchmark_capture import profile
 @profile()  # Auto-detect Neuron hardware
 def test_vllm_neuron_inference(benchmark, model_path, vllm_config, sample_prompts):
     """vLLM-Neuron inference benchmark."""
+
+    # Import vLLM here to ensure profiling env vars are set first
+    import vllm
 
     def setup():
         llm = vllm.LLM(model=model_path, **vllm_config)
@@ -64,6 +74,9 @@ def test_vllm_neuron_inference(benchmark, model_path, vllm_config, sample_prompt
 def test_vllm_neuron_tensor_parallel(benchmark, model_path, vllm_config, tp_degree):
     """vLLM-Neuron tensor parallelism sweep."""
 
+    # Import vLLM here to ensure profiling env vars are set first
+    import vllm
+
     def setup():
         config = vllm_config.copy()
         config["tensor_parallel_size"] = tp_degree
@@ -102,6 +115,9 @@ def test_vllm_neuron_tensor_parallel(benchmark, model_path, vllm_config, tp_degr
 @profile("neuron")
 def test_vllm_neuron_batch_sizes(benchmark, model_path, vllm_config, batch_size):
     """vLLM-Neuron batch size sweep."""
+
+    # Import vLLM here to ensure profiling env vars are set first
+    import vllm
 
     def setup():
         config = vllm_config.copy()
