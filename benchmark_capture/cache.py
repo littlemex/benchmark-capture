@@ -8,6 +8,10 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+# Constants for cache management
+BYTES_PER_MB = 1024**2
+DEFAULT_NEURON_CACHE_PATH = "/var/tmp/neuron-compile-cache"
+
 
 class CacheClearError(Exception):
     """Raised when cache clearing fails due to permissions or other issues."""
@@ -26,7 +30,7 @@ def get_neuron_cache_dir() -> Path:
     Returns:
         Path to Neuron compilation cache directory
     """
-    cache_url = os.getenv("NEURON_COMPILE_CACHE_URL", "/var/tmp/neuron-compile-cache")
+    cache_url = os.getenv("NEURON_COMPILE_CACHE_URL", DEFAULT_NEURON_CACHE_PATH)
 
     # Handle S3 URLs (not supported for local clearing)
     if cache_url.startswith("s3://"):
@@ -96,7 +100,7 @@ def clear_neuron_cache(
         try:
             # Calculate size before deletion
             cache_size = sum(f.stat().st_size for f in cache_dir.rglob("*") if f.is_file())
-            result["cache_size_mb"] = cache_size / (1024**2)
+            result["cache_size_mb"] = cache_size / BYTES_PER_MB
 
             if dry_run:
                 logger.info(
@@ -138,7 +142,7 @@ def clear_neuron_cache(
                     artifacts_size = sum(
                         f.stat().st_size for f in artifacts_dir.rglob("*") if f.is_file()
                     )
-                    result["artifacts_size_mb"] = artifacts_size / (1024**2)
+                    result["artifacts_size_mb"] = artifacts_size / BYTES_PER_MB
 
                     if dry_run:
                         logger.info(
@@ -206,7 +210,7 @@ def check_cache_status() -> dict:
             neff_files = list(cache_dir.rglob("*.neff"))
             result["cached_models_count"] = len(neff_files)
             cache_size = sum(f.stat().st_size for f in cache_dir.rglob("*") if f.is_file())
-            result["cache_size_mb"] = cache_size / (1024**2)
+            result["cache_size_mb"] = cache_size / BYTES_PER_MB
         except PermissionError:
             logger.warning(f"Permission denied when checking cache: {cache_dir}")
 
@@ -221,7 +225,7 @@ def check_cache_status() -> dict:
                 artifacts_size = sum(
                     f.stat().st_size for f in artifacts_dir.rglob("*") if f.is_file()
                 )
-                result["artifacts_size_mb"] = artifacts_size / (1024**2)
+                result["artifacts_size_mb"] = artifacts_size / BYTES_PER_MB
             except PermissionError:
                 logger.warning(f"Permission denied when checking artifacts: {artifacts_dir}")
 

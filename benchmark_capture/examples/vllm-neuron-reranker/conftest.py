@@ -8,6 +8,8 @@ import pytest
 import yaml
 from pathlib import Path
 
+from benchmark_capture.utils import VLLMConfigHelper
+
 
 @pytest.fixture(scope="session")
 def config():
@@ -28,8 +30,16 @@ def model_path(config):
 
 @pytest.fixture(scope="session")
 def vllm_config(config):
-    """vLLM-Neuron configuration (vLLM 0.13+ compatible)."""
-    return {
+    """
+    vLLM-Neuron configuration with hardware-aware optimization.
+
+    Uses VLLMConfigHelper to automatically detect hardware and apply
+    appropriate configuration:
+    - On Neuron: includes additional_config with override_neuron_config
+    - On GPU: excludes Neuron-specific settings
+    """
+    vllm_params = {
+        # Standard vLLM parameters
         "tensor_parallel_size": config['vllm']['tensor_parallel_size'],
         "max_num_seqs": config['vllm']['max_num_seqs'],
         "block_size": config['vllm']['block_size'],
@@ -38,7 +48,21 @@ def vllm_config(config):
         "num_gpu_blocks_override": config['vllm']['num_gpu_blocks_override'],
         "enable_prefix_caching": config['vllm']['enable_prefix_caching'],
         "dtype": config['vllm']['dtype'],
+
+        # Neuron-specific optimization (nested in additional_config)
+        # pa_num_blocks must match num_gpu_blocks_override
+        "additional_config": {
+            "override_neuron_config": {
+                "skip_warmup": True,
+                "pa_num_blocks": config['vllm']['num_gpu_blocks_override'],
+                "pa_block_size": 32,
+                "enable_bucketing": True,
+            }
+        }
     }
+
+    # Hardware-aware configuration builder
+    return VLLMConfigHelper(vllm_params).build()
 
 
 @pytest.fixture(scope="session")

@@ -126,6 +126,70 @@ class TestClearNeuronCache:
             with pytest.raises(CacheClearError, match="Permission denied"):
                 clear_neuron_cache(cache_dir=cache_dir, clear_artifacts=False)
 
+    def test_clear_cache_generic_exception(self, temp_dir: Path, clean_env: None) -> None:
+        """Test generic exception handling for cache."""
+        cache_dir = temp_dir / "cache"
+        cache_dir.mkdir()
+        (cache_dir / "model.neff").write_text("content")
+
+        with patch("shutil.rmtree") as mock_rmtree:
+            mock_rmtree.side_effect = RuntimeError("Unexpected error")
+
+            with pytest.raises(CacheClearError, match="Failed to clear cache"):
+                clear_neuron_cache(cache_dir=cache_dir, clear_artifacts=False)
+
+    def test_clear_artifacts_permission_error(self, temp_dir: Path, clean_env: None) -> None:
+        """Test permission error handling for artifacts."""
+        cache_dir = temp_dir / "cache"
+        artifacts_dir = temp_dir / "artifacts"
+
+        cache_dir.mkdir()
+        artifacts_dir.mkdir()
+        (artifacts_dir / "compiled.pt").write_text("artifact")
+
+        os.environ["NEURON_COMPILED_ARTIFACTS"] = str(artifacts_dir)
+
+        with patch("shutil.rmtree") as mock_rmtree:
+            # First call succeeds (cache), second call fails (artifacts)
+            mock_rmtree.side_effect = [None, PermissionError("Access denied")]
+
+            with pytest.raises(CacheClearError, match="Permission denied when clearing artifacts"):
+                clear_neuron_cache(cache_dir=cache_dir, clear_artifacts=True)
+
+    def test_clear_artifacts_generic_exception(self, temp_dir: Path, clean_env: None) -> None:
+        """Test generic exception handling for artifacts."""
+        cache_dir = temp_dir / "cache"
+        artifacts_dir = temp_dir / "artifacts"
+
+        cache_dir.mkdir()
+        artifacts_dir.mkdir()
+        (artifacts_dir / "compiled.pt").write_text("artifact")
+
+        os.environ["NEURON_COMPILED_ARTIFACTS"] = str(artifacts_dir)
+
+        with patch("shutil.rmtree") as mock_rmtree:
+            # First call succeeds (cache), second call fails (artifacts)
+            mock_rmtree.side_effect = [None, RuntimeError("Unexpected error")]
+
+            with pytest.raises(CacheClearError, match="Failed to clear artifacts"):
+                clear_neuron_cache(cache_dir=cache_dir, clear_artifacts=True)
+
+    def test_clear_artifacts_not_exists(self, temp_dir: Path, clean_env: None) -> None:
+        """Test clearing when artifacts directory doesn't exist."""
+        cache_dir = temp_dir / "cache"
+        artifacts_dir = temp_dir / "artifacts"
+
+        cache_dir.mkdir()
+        # artifacts_dir does not exist
+
+        os.environ["NEURON_COMPILED_ARTIFACTS"] = str(artifacts_dir)
+
+        result = clear_neuron_cache(cache_dir=cache_dir, clear_artifacts=True)
+
+        assert result["cache_cleared"] is True
+        assert result["artifacts_cleared"] is True  # Nothing to clear
+        assert result["artifacts_dir"] == str(artifacts_dir)
+
 
 class TestCheckCacheStatus:
     """Tests for checking cache status."""
@@ -173,3 +237,50 @@ class TestCheckCacheStatus:
         assert status["artifacts_exists"] is True
         assert status["artifacts_dir"] == str(artifacts_dir)
         assert status["artifacts_size_mb"] > 0
+
+    def test_check_cache_permission_error(self, temp_dir: Path, clean_env: None) -> None:
+        """Test checking status with permission error on cache."""
+        cache_dir = temp_dir / "cache"
+        cache_dir.mkdir()
+        (cache_dir / "model.neff").write_text("content")
+
+        os.environ["NEURON_COMPILE_CACHE_URL"] = str(cache_dir)
+
+        # Mock Path.rglob to raise PermissionError
+        with patch.object(Path, "rglob") as mock_rglob:
+            mock_rglob.side_effect = PermissionError("Access denied")
+
+            status = check_cache_status()
+
+            # Should still return status but with zero values
+            assert status["cache_exists"] is True
+            assert status["cache_size_mb"] == 0.0
+            assert status["cached_models_count"] == 0
+
+    def test_check_artifacts_permission_error(self, temp_dir: Path, clean_env: None) -> None:
+        """Test checking status with permission error on artifacts."""
+        cache_dir = temp_dir / "cache"
+        artifacts_dir = temp_dir / "artifacts"
+
+        cache_dir.mkdir()
+        artifacts_dir.mkdir()
+        (artifacts_dir / "compiled.pt").write_text("artifact")
+
+        os.environ["NEURON_COMPILE_CACHE_URL"] = str(cache_dir)
+        os.environ["NEURON_COMPILED_ARTIFACTS"] = str(artifacts_dir)
+
+        # Mock to allow cache check but fail on artifacts
+        original_rglob = Path.rglob
+
+        def selective_rglob(self, pattern):
+            if "artifacts" in str(self):
+                raise PermissionError("Access denied")
+            return original_rglob(self, pattern)
+
+        with patch.object(Path, "rglob", selective_rglob):
+            status = check_cache_status()
+
+            # Cache should work, artifacts should have None for size
+            assert status["cache_exists"] is True
+            assert status["artifacts_exists"] is True
+            assert status["artifacts_size_mb"] is None

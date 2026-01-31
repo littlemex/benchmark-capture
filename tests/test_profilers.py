@@ -238,6 +238,48 @@ class TestNeuronProfilerCacheManagement:
         assert metadata["clear_cache_before"] is True
         assert metadata["clear_cache_after"] is True
 
+    def test_clear_cache_before_raises_error(self, temp_dir: Path, clean_env: None) -> None:
+        """Test cache clearing error in setup is propagated."""
+        from unittest.mock import patch
+        from benchmark_capture.cache import CacheClearError
+
+        cache_dir = temp_dir / "cache"
+        cache_dir.mkdir()
+        os.environ["NEURON_COMPILE_CACHE_URL"] = str(cache_dir)
+
+        profiler = NeuronProfiler(output_dir=str(temp_dir / "output"), clear_cache_before=True)
+
+        # Patch where it's used, not where it's defined
+        with patch("benchmark_capture.profilers.neuron.clear_neuron_cache") as mock_clear:
+            mock_clear.side_effect = CacheClearError("Permission denied")
+
+            with pytest.raises(CacheClearError, match="Permission denied"):
+                profiler.setup("test_func")
+
+    def test_clear_cache_after_handles_error_gracefully(
+        self, temp_dir: Path, clean_env: None
+    ) -> None:
+        """Test cache clearing error in teardown is logged as warning."""
+        from unittest.mock import patch
+        from benchmark_capture.cache import CacheClearError
+
+        cache_dir = temp_dir / "cache"
+        cache_dir.mkdir()
+        os.environ["NEURON_COMPILE_CACHE_URL"] = str(cache_dir)
+
+        profiler = NeuronProfiler(output_dir=str(temp_dir / "output"), clear_cache_after=True)
+        profiler.setup("test_func")
+
+        # Patch where it's used, not where it's defined
+        with patch("benchmark_capture.profilers.neuron.clear_neuron_cache") as mock_clear:
+            mock_clear.side_effect = CacheClearError("Permission denied")
+
+            # Should not raise, just log warning
+            profiler.teardown()
+
+            # Verify clear was attempted
+            mock_clear.assert_called_once()
+
 
 class TestNeuronProfilerPerfettoMode:
     """Tests for NeuronProfiler Perfetto mode."""

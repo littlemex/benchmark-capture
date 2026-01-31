@@ -3,7 +3,8 @@
 # Model configuration
 model:
   # Path to the reranker model
-  # Example: "/home/coder/data-science/investigations/inf2-vllm-performance/models/Qwen3-0.6B-Reranker"
+  # Example: "/path/to/models/Qwen3-0.6B-Reranker"
+  # Use environment variable: export RERANKER_MODEL_PATH="/your/model/path"
   path: "{{ MODEL_PATH }}"
 
 # vLLM-Neuron engine settings

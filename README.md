@@ -307,17 +307,17 @@ vim config.yaml  # or nano, emacs, etc.
 # Find the line:
 #   path: "{{ MODEL_PATH }}"
 # Replace with your actual path:
-#   path: "/home/coder/models/Qwen3-0.6B-Reranker"
+#   path: "/path/to/models/Qwen3-0.6B-Reranker"
 ```
 
 **Option B: Use sed for automatic replacement**
 ```bash
 # Replace placeholder with actual path using sed
-sed -i 's|{{ MODEL_PATH }}|/home/coder/models/Qwen3-0.6B-Reranker|g' config.yaml
+sed -i 's|{{ MODEL_PATH }}|/path/to/models/Qwen3-0.6B-Reranker|g' config.yaml
 
 # Verify the change
 grep "path:" config.yaml
-# Should show: path: "/home/coder/models/Qwen3-0.6B-Reranker"
+# Should show: path: "/path/to/models/Qwen3-0.6B-Reranker"
 ```
 
 **Verify configuration:**
@@ -443,7 +443,7 @@ grep "{{ MODEL_PATH }}" config.yaml
 # If this returns a match, the placeholder is still there
 
 # Fix: Manually edit or re-run sed
-sed -i 's|{{ MODEL_PATH }}|/home/coder/models/Qwen3-0.6B-Reranker|g' config.yaml
+sed -i 's|{{ MODEL_PATH }}|/path/to/models/Qwen3-0.6B-Reranker|g' config.yaml
 
 # Important: Use your actual model path, not the example path
 # Check where you downloaded the model:
@@ -950,6 +950,90 @@ status = check_cache_status()
 print(f"Cache: {status['cache_size_mb']:.2f} MB")
 print(f"Cached models: {status['cached_models_count']}")
 ```
+
+## VLLMConfigHelper - Hardware-Aware Configuration
+
+**New in v0.2.1**: `VLLMConfigHelper` provides hardware-aware configuration management for vLLM/vLLM-Neuron benchmarks.
+
+### Why Use VLLMConfigHelper?
+
+When benchmarking vLLM on **both GPU and Neuron** hardware, Neuron-specific settings must be excluded on GPU to avoid errors. VLLMConfigHelper automatically handles this:
+
+```python
+from benchmark_capture.utils import VLLMConfigHelper
+
+# Define configuration with Neuron optimizations
+config = VLLMConfigHelper({
+    "tensor_parallel_size": 2,
+    "max_num_seqs": 4,
+    "num_gpu_blocks_override": 512,
+
+    # Neuron-specific settings (automatically excluded on GPU)
+    "additional_config": {
+        "override_neuron_config": {
+            "pa_num_blocks": 512,
+            "pa_block_size": 32,
+            "enable_bucketing": True,
+        }
+    }
+}).build()
+
+# Use with vLLM
+llm = vllm.LLM(model=model_path, **config)
+```
+
+**On Neuron hardware:**
+- Keeps `override_neuron_config` intact
+- Logs full configuration
+
+**On GPU hardware:**
+- Automatically removes `override_neuron_config`
+- Clean vLLM GPU configuration
+
+### Configuration Sweep with pytest
+
+VLLMConfigHelper works seamlessly with pytest parametrize for configuration sweeps:
+
+```python
+@pytest.mark.parametrize("pa_num_blocks", [256, 512, 1024])
+@profile("neuron", perfetto=True)
+def test_pa_blocks_sweep(benchmark, model_path, pa_num_blocks):
+    """Each configuration generates a separate profile file."""
+    config = VLLMConfigHelper({
+        "tensor_parallel_size": 2,
+        "num_gpu_blocks_override": pa_num_blocks,
+        "additional_config": {
+            "override_neuron_config": {
+                "pa_num_blocks": pa_num_blocks,  # Sweep parameter
+                "pa_block_size": 32,
+            }
+        }
+    }).build()
+
+    llm = vllm.LLM(model=model_path, **config)
+    result = benchmark(llm.generate, prompts)
+```
+
+**Important**: When using `pa_num_blocks`, also set `num_gpu_blocks_override` to the same value to ensure vLLM and NxDI have consistent block counts.
+
+### Key Features
+
+- **Hardware detection**: Auto-detects Neuron vs GPU environment
+- **Configuration filtering**: Removes Neuron-specific settings on GPU automatically
+- **Immutability**: Original config never mutated
+- **Logging**: Full visibility into applied configuration
+- **pytest-friendly**: Works with `pytest.mark.parametrize` for sweeps
+
+### Design Philosophy
+
+VLLMConfigHelper is **intentionally minimal**:
+- ✅ Hardware detection and config filtering ONLY
+- ❌ No transformation or management of Neuron settings
+- ❌ No validation or defaults
+
+**Why?** Neuron configurations change frequently. Users should manage `override_neuron_config` directly while VLLMConfigHelper handles hardware compatibility.
+
+See `examples/vllm-neuron-reranker/` for complete usage examples.
 
 ## Hardware-Agnostic Code
 

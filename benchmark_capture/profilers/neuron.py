@@ -9,6 +9,9 @@ from .base import Profiler
 
 logger = logging.getLogger(__name__)
 
+# Default timeout for Neuron execution (seconds)
+DEFAULT_NEURON_TIMEOUT = 600
+
 
 class NeuronProfiler(Profiler):
     """
@@ -80,7 +83,9 @@ class NeuronProfiler(Profiler):
     def _setup_standard_mode(self) -> None:
         """Setup standard NEURON_PROFILE mode (backward compatible)."""
         os.environ["NEURON_PROFILE"] = str(self.output_dir)
-        os.environ["NEURON_RT_EXEC_TIMEOUT"] = str(self.options.get("timeout", 600))
+        os.environ["NEURON_RT_EXEC_TIMEOUT"] = str(
+            self.options.get("timeout", DEFAULT_NEURON_TIMEOUT)
+        )
 
         if self.options.get("framework_profile", False):
             os.environ["NEURON_FRAMEWORK_DEBUG"] = "1"
@@ -91,7 +96,9 @@ class NeuronProfiler(Profiler):
         os.environ["NEURON_RT_INSPECT_SYSTEM_PROFILE"] = "1"
         os.environ["NEURON_RT_INSPECT_DEVICE_PROFILE"] = "1"
         os.environ["NEURON_RT_INSPECT_OUTPUT_DIR"] = str(self.output_dir)
-        os.environ["NEURON_RT_EXEC_TIMEOUT"] = str(self.options.get("timeout", 600))
+        os.environ["NEURON_RT_EXEC_TIMEOUT"] = str(
+            self.options.get("timeout", DEFAULT_NEURON_TIMEOUT)
+        )
 
         logger.info(f"Perfetto profiling enabled: {self.output_dir}")
 
@@ -140,7 +147,7 @@ class NeuronProfiler(Profiler):
         """
         metadata = {
             "profiler_type": "neuron",
-            "timeout": self.options.get("timeout", 600),
+            "timeout": self.options.get("timeout", DEFAULT_NEURON_TIMEOUT),
             "framework_profile": self.options.get("framework_profile", False),
             "clear_cache_before": self.options.get("clear_cache_before", False),
             "clear_cache_after": self.options.get("clear_cache_after", False),

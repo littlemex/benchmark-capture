@@ -68,22 +68,22 @@ class TestConfigLoading:
         self, temp_dir: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Test falls back gracefully if tomli/tomllib unavailable."""
+        from unittest.mock import patch
+        from benchmark_capture.config import _load_toml
+
         config_file = temp_dir / "benchmark.toml"
         config_file.write_text("[profiler]\nbackend = 'test'")
 
-        # Mock tomllib/tomli as unavailable
-        import sys
+        # Mock both tomllib and tomli as unavailable
+        def mock_import(name, *args, **kwargs):
+            if name in ("tomllib", "tomli"):
+                raise ImportError(f"No module named '{name}'")
+            return __import__(name, *args, **kwargs)
 
-        with monkeypatch.context() as m:
-            if "tomllib" in sys.modules:
-                m.delitem(sys.modules, "tomllib")
-            if "tomli" in sys.modules:
-                m.delitem(sys.modules, "tomli")
-
-            # Should return empty dict without crashing
-            _ = load_config(config_file)
-            # Note: actual result depends on Python version
-            # Python 3.11+ has tomllib built-in
+        with patch("builtins.__import__", side_effect=mock_import):
+            config = _load_toml(config_file)
+            # Should return empty dict when no TOML library available
+            assert config == {}
 
     def test_load_toml_handles_generic_exception(self, temp_dir: Path) -> None:
         """Test _load_toml handles generic exceptions gracefully."""
